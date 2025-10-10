@@ -1,24 +1,23 @@
 import os
-from flask import Flask, request, jsonify, send_from_directory, Response
+from flask import Flask, request, jsonify, send_from_directory, Response, abort
 from supabase import create_client, Client
-from werkzeug.utils import secure_filename
 
 # --- Percorsi ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-PUBLIC_DIR = os.path.join(BASE_DIR, "public")  # qui stanno index.html, js, css, immagini
+PUBLIC_DIR = os.path.join(BASE_DIR, "public")
 
-# --- Env vars richieste (Render → Settings → Environment) ---
-#   SUPABASE_URL        = https://<tuo-progetto>.supabase.co  (senza / finale)
-#   SUPABASE_ANON_KEY   = <service_role key>                  (NON usare anon read-only)
-#   SUPABASE_BUCKET     = planny-txt                          (o il tuo nome bucket)
-SUPABASE_URL = os.environ["SUPABASE_URL"].strip().rstrip("/")
+# --- Env vars (Render -> Settings -> Environment) ---
+# SUPABASE_URL       = https://<project>.supabase.co   (senza / finale)
+# SUPABASE_ANON_KEY  = <chiave>  (può essere anon o service_role se scrivi)
+# SUPABASE_BUCKET    = planny-txt (o il tuo bucket)
+SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = os.environ["SUPABASE_ANON_KEY"]
 BUCKET       = os.environ.get("SUPABASE_BUCKET", "planny-txt")
 
-# --- Client Supabase ---
+# --- Client unico (riuso connessioni) ---
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Statici serviti da /static per evitare conflitti con /api/*
+# Statici serviti da / (index.html) e /static/* se vuoi
 app = Flask(__name__, static_folder=PUBLIC_DIR, static_url_path="/static")
 
 
@@ -33,57 +32,65 @@ def index():
 
 # ---------- HELPERS ----------
 def _safe_name(name: str) -> str:
-    # rimuovi spazi/a-capo e path strani; es.: "selections_2026.txt"
-    return secure_filename(os.path.basename(name.strip()))
+    # impedisci path traversal; tieni solo l'ultimo segmento
+    return os.path.basename(name.strip())
 
-def _download_text(path: str) -> str:
-    try:
-        data = supabase.storage.from_(BUCKET).download(path)
-        return data.decode("utf-8", errors="replace")
-    except Exception:
-        return ""  # se non esiste, restituiamo vuoto
+def _upload_bytes(path: str, data: bytes) -> str:
+    # una sola chiamata: upsert True => sovrascrive se già esiste
+    supabase.storage.from_(BUCKET).upload(
+        path,
+        data,
+        {
+            "contentType": "text/plain; charset=utf-8",
+            "upsert": True,
+        },
+    )
+    return "upsert"
 
-def _upload_text(path: str, content: str) -> str:
-    data = content.encode("utf-8")
-    try:
-        # prova a sovrascrivere
-        supabase.storage.from_(BUCKET).update(path, data)
-        return "update"
-    except Exception:
-        # se non esiste, crea
-        supabase.storage.from_(BUCKET).upload(
-            path, data, {"contentType": "text/plain; charset=utf-8"}
-        )
-        return "upload"
+def _download_bytes(path: str) -> bytes:
+    return supabase.storage.from_(BUCKET).download(path)
 
 
 # ---------- API ----------
 @app.get("/api/files/<path:name>")
-def api_read_file(name):
+def api_read_file(name: str):
     fname = _safe_name(name)
-    txt = _download_text(fname)
-    status = 200 if txt != "" else 404
-    resp = Response(txt, status=status, mimetype="text/plain; charset=utf-8")
-    resp.headers["Cache-Control"] = "no-store, max-age=0"
-    resp.headers["X-Bucket"] = BUCKET
-    resp.headers["X-Path"] = fname
-    return resp
+    try:
+        data = _download_bytes(fname)  # bytes
+        # rispondi come testo; i client leggono correttamente UTF-8
+        return Response(data, mimetype="text/plain; charset=utf-8", headers={
+            "Cache-Control": "no-store, max-age=0",
+            "X-Bucket": BUCKET,
+            "X-Path": fname,
+        })
+    except Exception:
+        return Response("", status=404, mimetype="text/plain; charset=utf-8", headers={
+            "Cache-Control": "no-store, max-age=0",
+            "X-Bucket": BUCKET,
+            "X-Path": fname,
+        })
 
 @app.put("/api/files/<path:name>")
-def api_write_file(name):
+def api_write_file(name: str):
     fname = _safe_name(name)
-    raw = request.get_data() or b""
-    body = raw.decode("utf-8", errors="replace")
-    mode = _upload_text(fname, body)
-    return jsonify(ok=True, bucket=BUCKET, path=fname, mode=mode, size=len(body))
+    data = request.get_data(cache=False, as_text=False) or b""
+    if b"\x00" in data:
+        abort(400, "binary data not allowed")
+    mode = _upload_bytes(fname, data)
+    # risposta minimale e veloce
+    return jsonify(ok=True, bucket=BUCKET, path=fname, mode=mode, size=len(data))
 
-# (opzionale ma utile per debug)
+# (opzionale) elenco file nel bucket, utile per debug
 @app.get("/api/files/list")
 def api_list_files():
     try:
-        items = supabase.storage.from_(BUCKET).list("", {"limit": 200})
-        files = [{"name": it.get("name"), "updated_at": it.get("updated_at")} for it in items]
-        return jsonify(ok=True, bucket=BUCKET, files=files)
+        items = supabase.storage.from_(BUCKET).list("", {"limit": 500})
+        files = [{
+            "name": it.get("name"),
+            "updated_at": it.get("updated_at"),
+            "id": it.get("id"),
+        } for it in items]
+        return jsonify(ok=True, bucket=BUCKET, count=len(files), files=files)
     except Exception as e:
         return jsonify(ok=False, error=str(e)), 500
 
@@ -93,4 +100,5 @@ def healthz():
 
 
 if __name__ == "__main__":
+    # per esecuzione locale
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
