@@ -1530,5 +1530,97 @@ document.addEventListener('keydown', (e)=>{
 })();
 </script>
 
+
+<!-- ==== Planny Cloud Adapter (Supabase via Flask /api/files) ==== -->
+<script>
+(function(){
+  const API = '/api/files/';
+  const bust = () => '?ts=' + Date.now();
+  const fname = (y) => `selections_${String(y).trim()}.txt`;
+  const CFG = ['config.ini','config.txt'];
+
+  async function apiGet(n){
+    const r = await fetch(API + encodeURIComponent(n) + bust(), { cache:'no-store' });
+    if(r.status === 404) return null;
+    if(!r.ok) throw new Error('GET '+n+' -> '+r.status);
+    return await r.text();
+  }
+  async function apiPut(n, txt){
+    const r = await fetch(API + encodeURIComponent(n), { method:'PUT', body: txt ?? '' });
+    if(!r.ok) throw new Error('PUT '+n+' -> '+r.status);
+    try{ return await r.json(); }catch{ return {ok:true}; }
+  }
+
+  window.Cloud = {
+    async readSelections(year){
+      const name = fname(year);
+      const txt = await apiGet(name);
+      return txt ?? '';
+    },
+    async saveSelections(year, text){
+      const name = fname(year);
+      return await apiPut(name, text || '');
+    },
+    async readConfig(){
+      for(const n of CFG){
+        const t = await apiGet(n);
+        if(t !== null) return { name:n, text:t };
+      }
+      return { name: CFG[0], text: '' };
+    },
+    async saveConfig(text, name){
+      const n = name || (window.Cloud && window.Cloud._lastCfgName) || CFG[0];
+      window.Cloud._lastCfgName = n;
+      return await apiPut(n, text || '');
+    }
+  };
+
+  function boot(){
+    if(!window.state){ setTimeout(boot, 50); return; }
+    const y = window.state.year || new Date().getFullYear();
+    window.Cloud.readSelections(y).then(txt => {
+      if(typeof window.importSelectionsFromText === 'function'){
+        window.importSelectionsFromText(txt || '');
+      }
+      if(typeof window.renderCalendar === 'function'){
+        window.renderCalendar();
+      }
+    }).catch(err => console.warn('Cloud bootstrap read error:', err));
+
+    window.Cloud.readConfig().then(({name,text}) => {
+      window.Cloud._lastCfgName = name;
+      if(window.applyConfigFromText){
+        try{ window.applyConfigFromText(text); }catch(_){}
+      }
+    }).catch(()=>{});
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+
+  window.saveSelectionsToCloud = async function(){
+    const y = window.state?.year || new Date().getFullYear();
+    let text = '';
+    try{ text = (typeof window.selectionsToText === 'function') ? window.selectionsToText() : ''; }catch(_){}
+    if(!text && window.state && window.state.selections){
+      const arr = Array.from(window.state.selections.entries()).map(([k,v]) => k+','+v);
+      text = arr.join('\\n') + '\\n';
+    }
+    await window.Cloud.saveSelections(y, text);
+    console.log('[Cloud] Selections salvati:', y);
+  };
+
+  window.reloadSelectionsFromCloud = async function(){
+    const y = window.state?.year || new Date().getFullYear();
+    const txt = await window.Cloud.readSelections(y);
+    if(typeof window.importSelectionsFromText === 'function'){
+      window.importSelectionsFromText(txt || '');
+    }
+    if(typeof window.renderCalendar === 'function'){
+      window.renderCalendar();
+    }
+    console.log('[Cloud] Selections ricaricati:', y);
+  };
+})();
+</script>
 </body>
 </html>
