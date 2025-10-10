@@ -1531,76 +1531,83 @@ document.addEventListener('keydown', (e)=>{
 </script>
 
 
-<!-- === Cloud JSON override + year boot (UI invariata) === -->
+<!-- === CLOUD PATCH FINAL === -->
 <script>
 (function(){
-  // Override funzioni I/O: usano le rotte JSON per evitare download
-  window.getTextFromServer = async function(name){
-    const r = await fetch('/api/files/text/' + encodeURIComponent(name) + '?' + Date.now(), {cache:'no-store'});
-    if(!r.ok) return '';
-    const j = await r.json().catch(()=>({ok:false}));
-    return (j && j.ok) ? (j.text || '') : '';
+  // --- Intercetta tutte le letture file e forza l'uso del server JSON ---
+  const _origFetchText = typeof window.fetchText === 'function'
+    ? window.fetchText.bind(window)
+    : async function(name){
+        try {
+          const r = await fetch(name + '?' + Date.now(), {cache:'no-store'});
+          if (!r.ok) return '';
+          return await r.text();
+        } catch { return ''; }
+      };
+
+  async function getTextFromServerJSON(name){
+    try{
+      const r = await fetch('/api/files/text/' + encodeURIComponent(name) + '?' + Date.now(), {cache:'no-store'});
+      if (!r.ok) return '';
+      const j = await r.json().catch(()=>({ok:false}));
+      return (j && j.ok) ? (j.text || '') : '';
+    }catch{ return ''; }
+  }
+
+  window.fetchText = async function(name){
+    const mustServer = /^(config\.ini|config\.txt|selections_\d{4}\.txt|festivi_\d{4}\.txt)$/i.test(name);
+    let txt = await getTextFromServerJSON(name);
+    if (txt && txt.length) return txt;
+    if (mustServer) return '';
+    return await _origFetchText(name);
   };
+
   window.putTextToServer = async function(name, content){
     const r = await fetch('/api/files/text/' + encodeURIComponent(name), {
-      method:'PUT', headers:{'Content-Type':'text/plain; charset=utf-8'}, body: content || ''
+      method:'PUT',
+      headers:{'Content-Type':'text/plain; charset=utf-8'},
+      body: content || ''
     });
     const j = await r.json().catch(()=>({ok:false}));
-    if(!r.ok || !j.ok) throw new Error('HTTP '+r.status);
+    if (!r.ok || !j.ok) throw new Error('PUT ' + name + ' → ' + r.status);
     return j;
   };
 
-  // Boot: legge anni da config, imposta #year e carica selections
-  const yearInput = document.querySelector('#year');
-  const parseYears = (txt)=>{
-    const m = (txt||'').match(/^\s*anni\s*=\s*([0-9,\s]+)\s*$/im);
-    return m ? m[1].split(',').map(s=>+s.trim()).filter(Boolean) : null;
-  };
-  async function readYears(){
-    let y=null;
-    try{ y = parseYears(await window.getTextFromServer('config.ini')); }catch(_){}
-    if(!y || !y.length){
-      try{ y = parseYears(await window.getTextFromServer('config.txt')); }catch(_){}
-    }
-    if(!y || !y.length){
-      const now=new Date().getFullYear(); y=[now-1, now, now+1, now+2];
-    }
-    return y;
-  }
-  function nameFor(yr){ return `selections_${yr}.txt`; }
-  function waitReady(maxMs=5000){
+  async function waitApp(maxMs=5000){
     return new Promise(res=>{
       const t0=Date.now();
       (function tick(){
-        if(typeof window.importSelectionsFromText==='function' && typeof window.renderCalendar==='function') return res(true);
-        if(Date.now()-t0>maxMs) return res(false);
+        const ok = typeof window.importSelectionsFromText === 'function' &&
+                   typeof window.renderCalendar === 'function';
+        if (ok || Date.now()-t0>maxMs) return res(!!ok);
         setTimeout(tick,100);
       })();
     });
   }
-  async function loadYear(yr){
-    const txt = await window.getTextFromServer(nameFor(yr));
-    const ok = await waitReady();
-    if(ok){ window.importSelectionsFromText(txt||''); window.renderCalendar(); }
+  function detectYear(){
+    if (window.state && window.state.year) return +window.state.year;
+    const sel = document.querySelector('#year, #anno, #yearSelect, select[name=\"year\"], select[name=\"anno\"], .year-select, .anno-select');
+    if (sel && sel.value) return +sel.value;
+    const saved = +localStorage.getItem('plannyYear') || 0;
+    const now = new Date().getFullYear();
+    return saved || now;
   }
   async function boot(){
-    const years = await readYears();
-    const saved = Number(localStorage.getItem('plannyYear')||'0');
-    const now = new Date().getFullYear();
-    const start = years.includes(saved) ? saved : (years.includes(now)? now : years[0]);
-    window.state = window.state || {}; window.state.year = start;
-    if(yearInput){
-      yearInput.removeAttribute('disabled');
-      yearInput.value = String(start);
-      yearInput.addEventListener('change', async ()=>{
-        const v = parseInt(yearInput.value,10);
-        if(!isNaN(v)){ window.state.year=v; localStorage.setItem('plannyYear', String(v)); await loadYear(v); }
-      });
+    const year = detectYear();
+    const ok = await waitApp();
+    const name = `selections_${year}.txt`;
+    const txt = await window.fetchText(name);
+    if (ok){
+      window.importSelectionsFromText(txt || '');
+      window.renderCalendar();
+    } else {
+      console.warn('[Planny] funzioni non pronte; caricato', name, (txt||'').length, 'char');
     }
-    await loadYear(start);
   }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+  if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
 })();
 </script>
+<!-- === /CLOUD PATCH FINAL === -->
 </body>
 </html>
