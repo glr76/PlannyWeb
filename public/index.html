@@ -1531,80 +1531,64 @@ document.addEventListener('keydown', (e)=>{
 </script>
 
 
-<!-- === UNIVERSAL CLOUD INTERCEPT (no UI changes) === -->
+<!-- === CLOUD PATCH FINALE (UI invariata) === -->
 <script>
 (function(){
-  // Intercetta fetch() per i file chiave e reindirizza alle rotte JSON del server
-  const MUST = /(^|\/)(config\.ini|config\.txt|selections_\d{4}\.txt|festivi_\d{4}\.txt)$/i;
-  const origFetch = window.fetch.bind(window);
-
-  function basename(u){
-    try { return u.split('?')[0].split('#')[0].split('/').pop(); } catch { return u; }
-  }
-
-  async function serverRead(name){
-    const r = await origFetch('/api/files/text/' + encodeURIComponent(name) + '?' + Date.now(), { cache:'no-store' });
-    if (!r.ok) return new Response('', {status: r.status, headers:{'Content-Type':'text/plain; charset=utf-8'}});
-    const j = await r.json().catch(()=>({ok:false}));
-    if (!j || !j.ok) return new Response('', {status: 404, headers:{'Content-Type':'text/plain; charset=utf-8'}});
-    const txt = j.text || '';
-    return new Response(new Blob([txt], {type:'text/plain; charset=utf-8'}), {status:200, headers:{'Content-Type':'text/plain; charset=utf-8'}});
-  }
-
-  async function serverWrite(name, body){
-    const r = await origFetch('/api/files/text/' + encodeURIComponent(name), {
-      method:'PUT',
-      headers:{'Content-Type':'text/plain; charset=utf-8'},
-      body: body || ''
-    });
-    const j = await r.json().catch(()=>({ok:r.ok}));
-    const ok = r.ok && j && j.ok !== false;
-    const payload = JSON.stringify(ok ? (j || {ok:true}) : (j || {ok:false}));
-    return new Response(new Blob([payload], {type:'application/json'}), {
-      status: ok ? 200 : (r.status || 500),
-      headers: {'Content-Type':'application/json'}
-    });
-  }
-
-  window.fetch = async function(input, init){
+  // ====== helper: leggi/scrivi con preferenza al server JSON ======
+  async function cloudRead(name){
+    // 1) JSON endpoint
     try{
-      const url = (typeof input === 'string') ? input : (input && input.url) || '';
-      const isKeyFile = MUST.test(url);
-      if (!isKeyFile) return origFetch(input, init);
-
-      const name = basename(url);
-      const method = (init && init.method ? String(init.method) : 'GET').toUpperCase();
-
-      if (method === 'GET') {
-        return await serverRead(name);
-      } else if (method === 'PUT' || method === 'POST') {
-        const body = init && init.body;
-        return await serverWrite(name, body);
+      const r1 = await fetch('/api/files/text/' + encodeURIComponent(name) + '?' + Date.now(), {cache:'no-store'});
+      if (r1.ok) {
+        const j = await r1.json().catch(()=>({ok:false}));
+        if (j && j.ok) return j.text || '';
       }
-    }catch(e){
-      console.warn('[cloud intercept] errore', e);
-    }
-    // fallback default
-    return origFetch(input, init);
+    }catch(_){}
+    // 2) endpoint legacy (testo puro)
+    try{
+      const r2 = await fetch('/api/files/' + encodeURIComponent(name) + '?' + Date.now(), {cache:'no-store'});
+      if (r2.ok) return await r2.text();
+    }catch(_){}
+    // 3) fallback locale (public/)
+    try{
+      const r3 = await fetch(name + '?' + Date.now(), {cache:'no-store'});
+      if (r3.ok) return await r3.text();
+    }catch(_){}
+    return '';
+  }
+  async function cloudWrite(name, content){
+    // 1) JSON endpoint
+    try{
+      const r1 = await fetch('/api/files/text/' + encodeURIComponent(name), {
+        method:'PUT', headers:{'Content-Type':'text/plain; charset=utf-8'}, body: content || ''
+      });
+      const j = await r1.json().catch(()=>({ok:false}));
+      if (r1.ok && j && j.ok) return j;
+    }catch(_){}
+    // 2) legacy (risponde spesso text/plain)
+    try{
+      const r2 = await fetch('/api/files/' + encodeURIComponent(name), {
+        method:'PUT', headers:{'Content-Type':'text/plain; charset=utf-8'}, body: content || ''
+      });
+      if (r2.ok) { try { return await r2.json(); } catch { return {ok:true}; } }
+    }catch(_){}
+    throw new Error('Impossibile salvare ' + name);
+  }
+
+  // ====== Override minimo dei tuoi helper, se esistono ======
+  window.getTextFromServer = async function(name){ return await cloudRead(name); };
+  window.putTextToServer  = async function(name, content){ return await cloudWrite(name, content); };
+
+  // Se usi fetchText() nel tuo codice, forziamo anche quello a passare dal cloud
+  const _origFetchText = (typeof window.fetchText === 'function') ? window.fetchText.bind(window) : null;
+  window.fetchText = async function(name){
+    const must = /^(config\.ini|config\.txt|selections_\d{4}\.txt|festivi_\d{4}\.txt)$/i.test(name);
+    const txt = await cloudRead(name);
+    if (txt || must) return txt;
+    return _origFetchText ? await _origFetchText(name) : '';
   };
 
-  // Espone anche funzioni helper globali, in caso il tuo codice le usi
-  window.getTextFromServer = async function(name){
-    const r = await origFetch('/api/files/text/' + encodeURIComponent(name) + '?' + Date.now(), {cache:'no-store'});
-    if(!r.ok) return '';
-    const j = await r.json().catch(()=>({ok:false}));
-    return (j && j.ok) ? (j.text || '') : '';
-  };
-  window.putTextToServer = async function(name, content){
-    const r = await origFetch('/api/files/text/' + encodeURIComponent(name), {
-      method:'PUT', headers:{'Content-Type':'text/plain; charset=utf-8'}, body: content || ''
-    });
-    const j = await r.json().catch(()=>({ok:false}));
-    if(!r.ok || !j.ok) throw new Error('HTTP '+r.status);
-    return j;
-  };
-
-  // Boot minimale: carica selections_<anno>.txt se la tua app non lo ha già fatto
+  // ====== Boot robusto: carica selections_<anno>.txt e renderizza ======
   function detectYear(){
     if (window.state && window.state.year) return +window.state.year;
     const sel = document.querySelector('#year, #anno, #yearSelect, select[name="year"], select[name="anno"], .year-select, .anno-select');
@@ -1613,30 +1597,48 @@ document.addEventListener('keydown', (e)=>{
     const now = new Date().getFullYear();
     return saved || now;
   }
-  function waitReady(maxMs=5000){
+  function waitReady(maxMs=6000){
     return new Promise(res=>{
       const t0=Date.now();
       (function tick(){
-        const ok = typeof window.importSelectionsFromText === 'function' &&
-                   typeof window.renderCalendar === 'function';
-        if (ok || Date.now()-t0>maxMs) return res(!!ok);
-        setTimeout(tick,100);
+        const ok = (typeof window.importSelectionsFromText === 'function') &&
+                   (typeof window.renderCalendar === 'function');
+        if (ok || Date.now()-t0 > maxMs) return res(!!ok);
+        setTimeout(tick, 120);
       })();
     });
   }
+  async function loadAndRender(year){
+    const name = `selections_${year}.txt`;
+    const txt  = await cloudRead(name);
+    const ok   = await waitReady();
+    if (ok){ window.importSelectionsFromText(txt || ''); window.renderCalendar(); }
+    else { console.warn('[Planny] funzioni non pronte; caricato', name, (txt||'').length, 'char'); }
+  }
   async function boot(){
     const y = detectYear();
-    // Prova a caricare: se la tua app lo fa già, questa doppia GET verrà cacheata no-store ed è innocua
-    const res = await serverRead('selections_'+y+'.txt');
-    const txt = res.ok ? await res.text() : '';
-    const ok = await waitReady();
-    if (ok && txt!=null){
-      try { window.importSelectionsFromText(txt); window.renderCalendar(); } catch(_){}
+    window.state = window.state || {};
+    window.state.year = y;
+    await loadAndRender(y);
+
+    // se hai un tuo selettore anno, ricarica al cambio (non aggiungo UI)
+    const sel = document.querySelector('#year, #anno, #yearSelect, select[name="year"], select[name="anno"], .year-select, .anno-select');
+    if (sel){
+      sel.addEventListener('change', async ()=>{
+        const v = parseInt(sel.value, 10);
+        if (!Number.isNaN(v)) {
+          window.state.year = v;
+          localStorage.setItem('plannyYear', String(v));
+          await loadAndRender(v);
+        }
+      }, { passive:true });
     }
   }
-  if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
 })();
 </script>
-<!-- === /UNIVERSAL CLOUD INTERCEPT === -->
+<!-- === /CLOUD PATCH FINALE === -->
 </body>
 </html>
