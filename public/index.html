@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Planny Cloud</title>
+  <style>
+    :root {
+      --bg:#0b0f14;--card:#121820;--soft:#1a2330;
+      --text:#e8f0ff;--muted:#9fb3c8;--ok:#7cffb3;
+      --warn:#ffd27c;--err:#ff7c94;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);
+         font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    header{display:flex;align-items:center;justify-content:space-between;
+           padding:12px 18px;background:var(--card);border-bottom:1px solid #223}
+    h1{font-size:18px;margin:0}
+    .right{display:flex;align-items:center;gap:8px}
+    select,button{
+      background:var(--soft);color:var(--text);
+      border:1px solid #2b394a;border-radius:8px;
+      padding:6px 10px;font-size:14px
+    }
+    button{cursor:pointer}
+    main{padding:18px}
+    .card{
+      background:var(--card);border:1px solid #223;
+      border-radius:12px;padding:14px;margin-bottom:22px
+    }
+    textarea{
+      width:100%;min-height:280px;background:var(--soft);
+      color:var(--text);border:1px solid #2b394a;border-radius:10px;
+      padding:10px;resize:vertical;font-family:monospace;font-size:13px
+    }
+    .muted{color:var(--muted);font-size:12px}
+    .pill{
+      background:#15202b;border:1px solid #243446;
+      border-radius:999px;padding:4px 10px;font:12px monospace
+    }
+    .ok{color:var(--ok)}.warn{color:var(--warn)}.err{color:var(--err)}
+    #toast{
+      position:fixed;bottom:20px;right:20px;
+      background:var(--card);border:1px solid #2b394a;
+      padding:8px 14px;border-radius:8px;
+      color:var(--ok);opacity:0;transition:opacity .3s
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Planny Cloud</h1>
+  <div class="right">
+    <label for="yearSel" class="muted">Anno</label>
+    <select id="yearSel"></select>
+    <span id="fileName" class="pill"></span>
+    <button id="reloadBtn">Ricarica</button>
+    <button id="saveBtn">Salva</button>
+    <span id="status" class="muted"></span>
+  </div>
+</header>
+
+<main>
+  <div class="card">
+    <h2>Selections</h2>
+    <textarea id="txtBox" spellcheck="false" placeholder="Contenuto di selections_YYYY.txt..."></textarea>
+  </div>
+
+  <div class="card">
+    <h2>Config (config.ini)</h2>
+    <textarea id="cfgBox" spellcheck="false"></textarea><br>
+    <button id="reloadCfg">Ricarica config</button>
+    <button id="saveCfg">Salva config</button>
+    <span id="cfgStatus" class="muted"></span>
+  </div>
+</main>
+
+<div id="toast">✔ Salvato</div>
+
+<script>
+const API='/api/files/';
+const $=s=>document.querySelector(s);
+const yearSel=$('#yearSel'),fileName=$('#fileName'),
+      txtBox=$('#txtBox'),statusEl=$('#status'),
+      cfgBox=$('#cfgBox'),cfgStatus=$('#cfgStatus'),toast=$('#toast');
+
+const fname=y=>`selections_${y}.txt`;
+const bust=()=>'?ts='+Date.now();
+const setStatus=(el,txt,cls='muted')=>{el.className=cls;el.textContent=txt};
+const showToast=(msg,cls='ok')=>{
+  toast.textContent=msg;
+  toast.style.color=getComputedStyle(document.documentElement).getPropertyValue(`--${cls}`);
+  toast.style.opacity='1';
+  setTimeout(()=>toast.style.opacity='0',2000);
+};
+
+async function apiGet(n){
+  const r=await fetch(API+encodeURIComponent(n)+bust(),{cache:'no-store'});
+  if(!r.ok) throw new Error(r.status);
+  return await r.text();
+}
+async function apiPut(n,t){
+  const r=await fetch(API+encodeURIComponent(n),{method:'PUT',body:t??''});
+  return await r.json();
+}
+
+function populateYears(){
+  const now=new Date().getFullYear();
+  const ys=[now-1,now,now+1,now+2];
+  yearSel.innerHTML=ys.map(y=>`<option>${y}</option>`).join('');
+  const saved=localStorage.getItem('plannyYear');
+  yearSel.value=saved && ys.includes(+saved)?saved:now;
+  updateFile();
+}
+function updateFile(){
+  const y=yearSel.value;
+  localStorage.setItem('plannyYear',y);
+  const f=fname(y);
+  fileName.textContent=f;
+  return f;
+}
+
+async function loadSel(){
+  const f=updateFile();
+  try{setStatus(statusEl,'Carico...');txtBox.value=await apiGet(f);
+      setStatus(statusEl,'Caricato','ok')}
+  catch{txtBox.value='';setStatus(statusEl,'Nuovo file','warn')}
+}
+async function saveSel(){
+  const f=updateFile(),t=txtBox.value;
+  try{
+    setStatus(statusEl,'Salvo...');
+    const res=await apiPut(f,t);
+    setStatus(statusEl,'Salvato ✔','ok');showToast(`Salvato ${f}`,'ok');
+  }catch(e){setStatus(statusEl,e.message,'err')}
+}
+
+const CFG_NAMES=['config.ini','config.txt'];
+let currentCfg=localStorage.getItem('cfgName')||CFG_NAMES[0];
+
+async function loadCfg(){
+  for(const n of CFG_NAMES){
+    try{
+      setStatus(cfgStatus,`Carico ${n}...`);
+      cfgBox.value=await apiGet(n);
+      currentCfg=n;localStorage.setItem('cfgName',n);
+      setStatus(cfgStatus,`Caricato ${n}`,'ok');return;
+    }catch{}
+  }
+  cfgBox.value='';setStatus(cfgStatus,'Config non trovato','warn');
+}
+async function saveCfg(){
+  try{
+    setStatus(cfgStatus,'Salvo...');
+    const res=await apiPut(currentCfg,cfgBox.value);
+    setStatus(cfgStatus,`Salvato ${currentCfg}`,'ok');
+    showToast(`Config ${currentCfg} salvato`,'ok');
+  }catch(e){setStatus(cfgStatus,e.message,'err')}
+}
+
+yearSel.onchange=loadSel;
+$('#reloadBtn').onclick=loadSel;
+$('#saveBtn').onclick=saveSel;
+$('#reloadCfg').onclick=loadCfg;
+$('#saveCfg').onclick=saveCfg;
+
+window.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();saveSel();}
+});
+
+(async()=>{populateYears();await loadSel();await loadCfg();})();
+</script>
+</body>
+</html>
