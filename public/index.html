@@ -1661,5 +1661,94 @@ document.addEventListener('keydown', (e)=>{
 })();
 </script>
 <!-- === /Cloud JSON I/O + Status + Year selector === -->
+
+<!-- === FIX: Year selector inside header + robust boot === -->
+<script>
+(function(){
+  function mountYearSelector(years){
+    const header = document.querySelector('header') || document.body;
+    let box = document.getElementById('cloud-year-inline');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'cloud-year-inline';
+      box.style.display = 'flex';
+      box.style.alignItems = 'center';
+      box.style.gap = '6px';
+      box.style.marginLeft = '10px';
+      box.innerHTML = `
+        <label for="cloud-year-select" style="font-size:12px;opacity:.8;">Anno</label>
+        <select id="cloud-year-select" style="padding:2px 6px;border-radius:6px;border:1px solid #c8ced8"></select>
+      `;
+      header.appendChild(box);
+    }
+    const sel = box.querySelector('#cloud-year-select');
+    sel.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+    const saved = Number(localStorage.getItem('plannyYear') || '0');
+    const now = new Date().getFullYear();
+    const start = years.includes(saved) ? saved : (years.includes(now) ? now : years[0]);
+    sel.value = String(start);
+    window.state = window.state || {};
+    window.state.year = start;
+    sel.onchange = async () => {
+      window.state.year = Number(sel.value);
+      localStorage.setItem('plannyYear', sel.value);
+      await loadSelectionsAndRender(window.state.year);
+    };
+  }
+  async function readYearsFromConfig(){
+    function parseIniYears(txt){
+      const m = (txt||'').match(/^\s*anni\s*=\s*([0-9,\s]+)\s*$/im);
+      if(!m) return null;
+      return m[1].split(',').map(s=>s.trim()).filter(Boolean).map(Number);
+    }
+    try {
+      const ini = await (window.getTextFromServer ? window.getTextFromServer('config.ini') : '');
+      let years = parseIniYears(ini);
+      if (years && years.length) return years;
+      const txt = await (window.getTextFromServer ? window.getTextFromServer('config.txt') : '');
+      years = parseIniYears(txt);
+      if (years && years.length) return years;
+    } catch {}
+    const now = new Date().getFullYear();
+    return [now-1, now, now+1, now+2];
+  }
+  function waitForAppFns(maxMs=5000){
+    return new Promise((resolve) => {
+      const t0 = Date.now();
+      (function tick(){
+        const ok = typeof window.importSelectionsFromText === 'function' &&
+                   typeof window.renderCalendar === 'function';
+        if (ok || Date.now()-t0 > maxMs) return resolve(Boolean(ok));
+        setTimeout(tick, 100);
+      })();
+    });
+  }
+  async function loadSelectionsAndRender(year){
+    const name = `selections_${String(year)}.txt`;
+    try{
+      const txt = await window.getTextFromServer(name);
+      const ready = await waitForAppFns();
+      if (ready) {
+        window.importSelectionsFromText(txt || '');
+        window.renderCalendar();
+      } else {
+        const term = document.getElementById('terminal');
+        if (term) { term.value += `\\n(render) Funzioni non trovate; caricato ${name} (${(txt||'').length} char)`; }
+      }
+    } catch(e){
+      const term = document.getElementById('terminal');
+      if (term) { term.value += `\\nERRORE lettura ${name}: ${e}`; }
+    }
+  }
+  async function boot(){
+    const years = await readYearsFromConfig();
+    mountYearSelector(years);
+    await loadSelectionsAndRender(window.state.year);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+<!-- === /FIX Year selector inside header === -->
 </body>
 </html>
