@@ -1,247 +1,101 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Planny Cloud</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: system-ui, sans-serif;
-      background: #f6f7fb;
-      color: #222;
-    }
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px 14px;
-      background: #e9ecf4;
-      border-bottom: 1px solid #ccc;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-    h1 {
-      margin: 0;
-      font-size: 18px;
-    }
-    main {
-      padding: 16px;
-    }
-
-    /* === Spia di stato === */
-    #cloud-status-indicator {
-      position: fixed;
-      top: 10px;
-      right: 12px;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      box-shadow: 0 0 4px #0004;
-      z-index: 9999;
-      background-color: #888;
-      transition: background-color 0.3s ease;
-    }
-    #cloud-status-indicator[data-state="ok"] { background-color: #1ec91e; }
-    #cloud-status-indicator[data-state="dirty"] { background-color: #e33; }
-    #cloud-status-indicator[data-state="saving"] { background-color: #ffb300; }
-    #cloud-status-indicator::after {
-      content: attr(title);
-      position: absolute;
-      right: 20px;
-      top: -2px;
-      font-size: 11px;
-      color: #333;
-      background: #fff9;
-      padding: 2px 4px;
-      border-radius: 4px;
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-    #cloud-status-indicator:hover::after { opacity: 1; }
-
-    /* === Selettore anno === */
-    #cloud-year-box {
-      position: fixed;
-      top: 10px;
-      left: 12px;
-      background: #fff8;
-      padding: 4px 6px;
-      border-radius: 8px;
-      z-index: 9999;
-      backdrop-filter: blur(3px);
-      font-size: 12px;
-      display: flex;
-      gap: 6px;
-      align-items: center;
-    }
-    #cloud-year-box select {
-      padding: 2px 6px;
-      border-radius: 6px;
-      border: 1px solid #c8ced8;
-    }
-
-    /* === Calendario o contenuto principale === */
-    #calendar {
-      min-height: 400px;
-      border: 1px solid #ccc;
-      background: #fff;
-      margin-top: 20px;
-      padding: 10px;
-      border-radius: 6px;
-    }
-
-    /* === Terminale debug === */
-    #terminal {
-      width: 100%;
-      height: 120px;
-      background: #111;
-      color: #0f0;
-      font-family: monospace;
-      overflow-y: auto;
-      padding: 6px;
-      border-radius: 6px;
-      margin-top: 16px;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planny Cloud</title>
+<style>
+body{margin:0;font-family:system-ui;background:#f8f9fb;}
+header{background:#e9ecf4;padding:8px 12px;border-bottom:1px solid #ccc;display:flex;align-items:center;justify-content:space-between}
+#annoSelect{margin-right:10px;}
+#statusLight{width:14px;height:14px;border-radius:50%;box-shadow:0 0 4px #0003;transition:background .3s;}
+#statusLight.ok{background:#20d420;} #statusLight.saving{background:#ffc400;} #statusLight.error{background:#e33;}
+#calendar{width:100%;height:600px;background:#fff;border:1px solid #ccc;margin:10px auto;border-radius:6px;overflow:auto;}
+#terminal{width:100%;height:130px;background:#111;color:#0f0;font-family:monospace;overflow-y:auto;border-top:2px solid #333;padding:4px;}
+</style>
 </head>
 <body>
-  <header>
-    <h1>Planny Cloud</h1>
-  </header>
-  <main>
-    <div id="cloud-year-box">
-      <label>Anno</label>
-      <select id="cloud-year-select"></select>
-    </div>
-    <div id="cloud-status-indicator" title="Tutto salvato"></div>
+<header>
+  <div>
+    <label>Anno</label>
+    <select id="annoSelect"></select>
+  </div>
+  <div id="statusLight" class="ok" title="Tutto salvato"></div>
+</header>
 
-    <div id="calendar">
-      <p>Calendario o contenuti caricati qui...</p>
-    </div>
+<div id="calendar">Caricamento calendario...</div>
+<textarea id="terminal" readonly>[Terminale pronto]</textarea>
 
-    <textarea id="terminal" readonly>[Terminale pronto]</textarea>
-  </main>
+<script>
+(function(){
+  const term = document.getElementById('terminal');
+  const cal = document.getElementById('calendar');
+  const sel = document.getElementById('annoSelect');
+  const light = document.getElementById('statusLight');
+  function log(msg){term.value += "\\n"+msg; term.scrollTop=term.scrollHeight;}
+  function setStatus(s,t){light.className=s; if(t)light.title=t; log("["+new Date().toLocaleTimeString()+"] "+t);}
 
-  <!-- ================= PLANNY CLOUD SCRIPT ================= -->
-  <script>
-  (function(){
-    const API = '/api/files/text/';
-    const CFG = ['config.ini','config.txt'];
-    const bust = () => '?ts=' + Date.now();
-    const fname = y => `selections_${String(y).trim()}.txt`;
+  const API = '/api/files/text/';
+  function fname(y){return `selections_${y}.txt`;}
 
-    const term = document.getElementById('terminal');
-    function log(msg){ term.value += "\\n" + msg; term.scrollTop = term.scrollHeight; }
-
-    const spy = document.getElementById('cloud-status-indicator');
-    function setSpy(state, text){
-      spy.dataset.state = state;
-      if (text) spy.title = text;
-      log(`[${new Date().toLocaleTimeString()}] ${text || state}`);
-    }
-
-    // --- API robusta ---
-    async function apiGet(n){
-      const r = await fetch(API + encodeURIComponent(n) + bust(), { cache:'no-store' });
-      if (!r.ok) throw new Error('GET ' + n + ' → ' + r.status);
-      const j = await r.json();
-      if (!j.ok) throw new Error('ERR ' + j.error);
-      return j.text;
-    }
-    async function apiPut(n, txt){
-      setSpy('saving', 'Salvataggio in corso…');
-      const r = await fetch(API + encodeURIComponent(n), {
-        method:'PUT',
-        headers:{ 'Content-Type':'text/plain; charset=utf-8' },
-        body: txt ?? ''
-      });
-      const j = await r.json().catch(()=>({ok:false}));
-      if (!r.ok || !j.ok) {
-        setSpy('dirty','Errore salvataggio');
-        throw new Error('PUT ' + n + ' → ' + r.status);
-      }
-      setSpy('ok','Tutto salvato');
-      return j;
-    }
-
-    // --- Cloud adapter globale ---
-    window.Cloud = {
-      async readSelections(year){ const t = await apiGet(fname(year)); return t || ''; },
-      async saveSelections(year, text){
-        window._savingInProgress = true;
-        try { return await apiPut(fname(year), text || ''); }
-        finally { window._savingInProgress = false; }
-      },
-      async readConfig(){
-        for(const n of CFG){ try{ const t=await apiGet(n); if(t) return {name:n,text:t}; }catch{} }
-        return {name:CFG[0],text:''};
-      },
-      async saveConfig(text,name){
-        const n=name||(window.Cloud&&window.Cloud._lastCfgName)||CFG[0];
-        window.Cloud._lastCfgName=n;
-        return await apiPut(n, text||'');
-      }
-    };
-
-    // --- Spia "dirty" (da chiamare nei tuoi eventi di modifica) ---
-    let dirtyTimer;
-    window.markDirty = function(){
-      if (spy.dataset.state==='saving') return;
-      setSpy('dirty','Modifiche non salvate');
-      clearTimeout(dirtyTimer);
-      dirtyTimer = setTimeout(()=>{},300);
-    };
-
-    // --- Protezione anti-refresh durante salvataggio ---
-    window.onbeforeunload = function(e){
-      if (window._savingInProgress) {
-        e.preventDefault();
-        e.returnValue = 'Attendi che il salvataggio termini.';
-        return e.returnValue;
-      }
-    };
-
-    // --- Anno dinamico ---
-    const sel = document.getElementById('cloud-year-select');
-    function fillYears(list){
-      sel.innerHTML = list.map(y=>`<option value="${y}">${y}</option>`).join('');
-      const saved = localStorage.getItem('plannyYear');
-      const now = new Date().getFullYear();
-      const target = saved && list.includes(+saved) ? +saved : now;
-      sel.value = target;
-      window.state = { year: target };
-    }
-
-    async function boot(){
-      try{
-        const {text} = await Cloud.readConfig();
-        const m = text.match(/anni\s*=\s*([\d,\s]+)/i);
-        let list = m ? m[1].split(',').map(x=>+x.trim()).filter(Boolean) : null;
-        if(!list) list = [2024,2025,2026,2027];
-        fillYears(list);
-        const y = window.state.year;
-        const txt = await Cloud.readSelections(y);
-        if (txt) log(`✔ Lettura ${fname(y)} (${txt.length} char)`);
-        else log(`⚠ Nessun file per ${y}`);
-      }catch(e){
-        setSpy('dirty','Errore connessione');
-        log('ERRORE: '+e.message);
-      }
-      setSpy('ok','Tutto salvato');
-    }
-
-    sel.addEventListener('change', async ()=>{
-      window.state.year = +sel.value;
-      localStorage.setItem('plannyYear', sel.value);
-      const txt = await Cloud.readSelections(window.state.year);
-      log(`Anno cambiato → ${sel.value}, file letto (${txt.length} char)`);
-      setSpy('ok','Tutto salvato');
+  async function cloudGet(file){
+    const r = await fetch(API+encodeURIComponent(file)+'?'+Date.now());
+    if(!r.ok)return '';
+    const j = await r.json().catch(()=>({}));
+    return j.text||'';
+  }
+  async function cloudPut(file,text){
+    setStatus('saving','Salvataggio in corso…');
+    const r = await fetch(API+encodeURIComponent(file),{
+      method:'PUT',
+      headers:{'Content-Type':'text/plain; charset=utf-8'},
+      body:text||''
     });
+    const j = await r.json().catch(()=>({ok:false}));
+    if(!j.ok||!r.ok){setStatus('error','Errore salvataggio');return false;}
+    setStatus('ok','Tutto salvato');
+    return true;
+  }
 
-    document.addEventListener('DOMContentLoaded', boot);
-  })();
-  </script>
+  window.Cloud={
+    async load(y){
+      const t=await cloudGet(fname(y));
+      if(typeof importSelectionsFromText==='function')importSelectionsFromText(t);
+      if(typeof renderCalendar==='function')renderCalendar();
+      log(`✔ Caricato ${fname(y)} (${t.length} char)`);
+      return t;
+    },
+    async save(y,text){
+      await cloudPut(fname(y),text);
+    }
+  };
+
+  async function boot(){
+    const now=new Date().getFullYear();
+    const years=[now-1,now,now+1];
+    sel.innerHTML=years.map(y=>`<option>${y}</option>`).join('');
+    const saved=localStorage.getItem('plannyYear');
+    const y=saved||now;
+    sel.value=y;
+    window.state={year:y};
+    await Cloud.load(y);
+  }
+
+  sel.addEventListener('change',async()=>{
+    const y=sel.value;
+    window.state.year=y;
+    localStorage.setItem('plannyYear',y);
+    await Cloud.load(y);
+  });
+
+  window.addEventListener('beforeunload',(e)=>{
+    if(light.classList.contains('saving')){
+      e.preventDefault(); e.returnValue='Attendi che il salvataggio termini.';
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded',boot);
+})();
+</script>
 </body>
 </html>
