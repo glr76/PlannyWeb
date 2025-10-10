@@ -1,0 +1,223 @@
+import os
+import io
+import re
+from datetime import datetime
+from flask import Flask, request, jsonify, send_from_directory, abort, Response
+from werkzeug.utils import secure_filename
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, Side, Font, PatternFill
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PUBLIC_DIR = os.path.join(BASE_DIR, "public")
+
+app = Flask(__name__, static_folder=PUBLIC_DIR, static_url_path='')
+
+# ---------- STATIC ----------
+@app.get("/")
+def index():
+    index_path = os.path.join(PUBLIC_DIR, "index.html")
+    if not os.path.exists(index_path):
+        return "index.html non trovato in /public", 404
+    return send_from_directory(PUBLIC_DIR, "index.html")
+
+@app.get("/<path:asset>")
+def static_files(asset):
+    path = os.path.join(PUBLIC_DIR, asset)
+    if not os.path.exists(path):
+        abort(404)
+    directory, fname = os.path.split(path)
+    return send_from_directory(directory, fname)
+
+# ---------- FILE API (GET/PUT) ----------
+@app.get("/api/files/<path:name>")
+def api_read_file(name):
+    safe = secure_filename(name)
+    fpath = os.path.join(PUBLIC_DIR, safe)
+    if not os.path.exists(fpath):
+        return "", 404
+    with open(fpath, "rb") as f:
+        data = f.read()
+    return Response(data, mimetype="text/plain; charset=utf-8")
+
+@app.put("/api/files/<path:name>")
+def api_write_file(name):
+    safe = secure_filename(name)
+    fpath = os.path.join(PUBLIC_DIR, safe)
+    os.makedirs(os.path.dirname(fpath) or PUBLIC_DIR, exist_ok=True)
+    data = request.get_data() or b""
+    with open(fpath, "wb") as f:
+        f.write(data)
+    return jsonify(ok=True, path=safe)
+
+# ---------- UTILITIES EXCEL ----------
+DATE_RE = re.compile(r"^(\d{2})-(\d{2})-(\d{4})$")
+MONTHS_IT = ["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"]
+
+def col_letter(n: int) -> str:
+    """1 -> A, 2 -> B, ..., 27 -> AA, ecc."""
+    s = ""
+    while n > 0:
+        n, r = divmod(n-1, 26)
+        s = chr(65 + r) + s
+    return s
+
+def _best_col_width(values, minimum=10, maximum=35, padding=2):
+    max_len = 0
+    for v in values:
+        if v is None:
+            continue
+        s = str(v)
+        l = sum(1.2 if c.isupper() else 1 for c in s)
+        if l > max_len:
+            max_len = l
+    width = max(minimum, min(maximum, int(max_len + padding)))
+    return width
+
+def build_workbook_from_sheets(sheets: dict) -> Workbook:
+    """
+    sheets: { "Gen":[["Data","A","B"],["01-01-2025","TS1",""]], ... }
+    Ordina i fogli dal mese corrente (oggi) e poi a scalare (wrap).
+    Applica formattazione: header bold + fill, bordi, centering, freeze panes, larghezze.
+    """
+    today = datetime.now()
+    start_m = today.month  # 1..12
+    order = list(range(start_m, 13)) + list(range(1, start_m))
+    # Filtra solo chiavi presenti in sheets
+    ordered_keys = []
+    for m in order:
+        key = MONTHS_IT[m-1]
+        if key in sheets:
+            ordered_keys.append(key)
+    # Aggiungi eventuali chiavi extra non mappate ai mesi standard
+    for k in sheets.keys():
+        if k not in ordered_keys:
+            ordered_keys.append(k)
+
+    align_center = Alignment(horizontal="center", vertical="center")
+    thin = Side(style="thin", color="FFB0B0B0")
+    border_all = Border(left=thin, right=thin, top=thin, bottom=thin)
+    header_font = Font(bold=True, color="FF0F1720")
+    header_fill = PatternFill("solid", fgColor="FFDBEAFE")
+    date_fmt = "DD-MM-YYYY"
+
+    wb = Workbook()
+    # rimuovi foglio di default se vuoto
+    if wb.active and wb.active.title == "Sheet":
+        wb.remove(wb.active)
+
+    for sheet_name in ordered_keys:
+        rows = sheets.get(sheet_name) or []
+        title = (sheet_name or "Sheet")[:31] or "Sheet"
+        ws = wb.create_sheet(title=title)
+
+        # scrittura celle + formato
+        for r_idx, row in enumerate(rows, start=1):
+            for c_idx, val in enumerate(row, start=1):
+                cell = ws.cell(row=r_idx, column=c_idx)
+
+                # prima colonna "Data" (eccetto header) -> trasforma in data
+                if c_idx == 1 and r_idx > 1 and isinstance(val, str):
+                    m = DATE_RE.match(val.strip())
+                    if m:
+                        d, mth, y = map(int, m.groups())
+                        try:
+                            cell.value = datetime(y, mth, d)
+                            cell.number_format = date_fmt
+                        except ValueError:
+                            cell.value = val
+                    else:
+                        cell.value = val
+                else:
+                    cell.value = None if (val is None or val == "") else val
+
+                cell.alignment = align_center
+                cell.border = border_all
+
+        # header formattato
+        last_col = len(rows[0]) if rows else 1
+        for c in range(1, last_col + 1):
+            hcell = ws.cell(row=1, column=c)
+            hcell.font = header_font
+            hcell.fill = header_fill
+            hcell.alignment = align_center
+            hcell.border = border_all
+
+        ws.freeze_panes = "A2"
+        ws.row_dimensions[1].height = 22
+        for r in range(2, len(rows) + 1):
+            ws.row_dimensions[r].height = 20
+
+        # larghezze colonne
+        columns_values = {c: [] for c in range(1, last_col + 1)}
+        for r in range(1, len(rows) + 1):
+            for c in range(1, last_col + 1):
+                columns_values[c].append(ws.cell(row=r, column=c).value)
+
+        for c in range(1, last_col + 1):
+            col = col_letter(c)
+            if c == 1:
+                ws.column_dimensions[col].width = 12
+            else:
+                width = _best_col_width(columns_values[c], minimum=10, maximum=30, padding=2)
+                ws.column_dimensions[col].width = width
+
+        ws.auto_filter.ref = ws.dimensions
+
+    return wb
+
+# ---------- EXPORT XLSX (download) ----------
+@app.post("/api/export/xlsx")
+def api_export_xlsx():
+    payload = request.get_json(force=True, silent=True)
+    if not payload:
+        return jsonify(ok=False, error="JSON mancante"), 400
+    sheets = payload.get("sheets")
+    if not isinstance(sheets, dict) or not sheets:
+        return jsonify(ok=False, error="'sheets' mancante o vuoto"), 400
+
+    filename = payload.get("filename") or f"monthly_data_{datetime.now().year}.xlsx"
+    safe_name = secure_filename(filename) or "export.xlsx"
+
+    wb = build_workbook_from_sheets(sheets)
+
+    mem = io.BytesIO()
+    wb.save(mem)
+    mem.seek(0)
+
+    resp = Response(
+        mem.getvalue(),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    resp.headers["Content-Disposition"] = f'attachment; filename="{safe_name}"'
+    return resp
+
+# ---------- EXPORT XLSX (SALVA SU DISCO, NO DOWNLOAD) ----------
+@app.post("/api/export/xlsx/save")
+def api_export_xlsx_save():
+    """
+    Salva/overwrite l'Excel nella cartella del progetto.
+    Body JSON:
+      { "filename": "monthly_data_2025.xlsx", "sheets": {...} }
+    """
+    payload = request.get_json(force=True, silent=True)
+    if not payload:
+        return jsonify(ok=False, error="JSON mancante"), 400
+    sheets = payload.get("sheets")
+    if not isinstance(sheets, dict) or not sheets:
+        return jsonify(ok=False, error="'sheets' mancante o vuoto"), 400
+
+    filename = payload.get("filename") or f"monthly_data_{datetime.now().year}.xlsx"
+    safe_name = secure_filename(filename) or "export.xlsx"
+    out_path = os.path.join(PUBLIC_DIR, safe_name)
+
+    wb = build_workbook_from_sheets(sheets)
+
+    try:
+        wb.save(out_path)  # overwrite
+    except Exception as e:
+        return jsonify(ok=False, error=f"write_error: {e}"), 500
+
+    return jsonify(ok=True, path=safe_name)
+
+if __name__ == "__main__":
+    app.run(host="127.0.0.1", port=8000, debug=True)
