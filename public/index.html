@@ -1531,7 +1531,7 @@ document.addEventListener('keydown', (e)=>{
 </script>
 
 
-<!-- === Cloud JSON I/O + Status indicator (non-invasivo) === -->
+<!-- === Cloud JSON I/O + Status indicator + Year selector (non-invasivo) === -->
 <style>
 #cloud-indicator {
   position: fixed; top: 10px; right: 10px; width: 14px; height: 14px;
@@ -1540,12 +1540,25 @@ document.addEventListener('keydown', (e)=>{
 }
 #cloud-indicator.saving { background: #ffb400; }
 #cloud-indicator.error  { background: #e33; }
+
+#cloud-year-box {
+  position: fixed; top: 10px; left: 10px;
+  background: #ffffffcc; backdrop-filter: blur(2px);
+  border: 1px solid #c8ced8; border-radius: 8px;
+  padding: 4px 6px; font: 12px system-ui; color: #111; z-index: 9999;
+  display: flex; align-items: center; gap: 6px;
+}
+#cloud-year-box select { padding: 2px 6px; border-radius: 6px; border: 1px solid #c8ced8; }
 </style>
 <div id="cloud-indicator" title="Tutto salvato"></div>
+<div id="cloud-year-box" style="display:none;">
+  <label for="cloud-year-select">Anno</label>
+  <select id="cloud-year-select"></select>
+</div>
 <script>
 // Re-bind funzioni I/O in modo robusto (JSON) senza toccare la tua UI.
 (function(){
-  // Nuove versioni: usano /api/files/text/... (JSON) per evitare download
+  // JSON I/O per evitare download
   async function __getTextFromServer_JSON(name){
     const r = await fetch('/api/files/text/' + encodeURIComponent(name) + '?' + Date.now(), {cache:'no-store'});
     if (!r.ok) return '';
@@ -1562,7 +1575,6 @@ document.addEventListener('keydown', (e)=>{
     if (!r.ok || !j.ok) throw new Error('PUT ' + name + ' → ' + r.status);
     return j;
   }
-
   // Pubblica/ridefinisci le funzioni globali usate dalla tua UI
   window.getTextFromServer = __getTextFromServer_JSON;
   window.putTextToServer  = __putTextToServer_JSON;
@@ -1588,8 +1600,66 @@ document.addEventListener('keydown', (e)=>{
       e.preventDefault(); e.returnValue = 'Attendi il completamento del salvataggio.';
     }
   });
+
+  // ===== Year selector + boot loader =====
+  function parseIniYears(txt){
+    const m = (txt||'').match(/^\s*anni\s*=\s*([0-9,\s]+)\s*$/im);
+    if(!m) return null;
+    return m[1].split(',').map(s=>s.trim()).filter(Boolean).map(Number);
+  }
+  async function readYearsFromConfig(){
+    try {
+      const ini = await window.getTextFromServer('config.ini');
+      let years = parseIniYears(ini);
+      if (years && years.length) return years;
+      const txt = await window.getTextFromServer('config.txt');
+      years = parseIniYears(txt);
+      if (years && years.length) return years;
+    } catch {}
+    const now = new Date().getFullYear();
+    return [now-1, now, now+1, now+2];
+  }
+  function selectionsName(year){ return `selections_${String(year)}.txt`; }
+
+  async function bootCloudUI(){
+    // Mostra box anno
+    const box = document.getElementById('cloud-year-box');
+    const sel = document.getElementById('cloud-year-select');
+    box.style.display = 'flex';
+
+    const years = await readYearsFromConfig();
+    sel.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+    const saved = Number(localStorage.getItem('plannyYear') || '0');
+    const now = new Date().getFullYear();
+    const year = years.includes(saved) ? saved : (years.includes(now) ? now : years[0]);
+    sel.value = String(year);
+    window.state = window.state || {}; window.state.year = year;
+
+    // Carica selections iniziali e renderizza con le TUE funzioni
+    async function loadAndRender(y){
+      const name = selectionsName(y);
+      const txt  = await window.getTextFromServer(name) || '';
+      if (typeof window.importSelectionsFromText === 'function') window.importSelectionsFromText(txt);
+      if (typeof window.renderCalendar === 'function') window.renderCalendar();
+      // Se non ci sono le tue funzioni, non faccio fallback grafici: UI rimane invariata
+    }
+    await loadAndRender(year);
+
+    sel.addEventListener('change', async () => {
+      const y = Number(sel.value);
+      window.state.year = y;
+      localStorage.setItem('plannyYear', String(y));
+      await loadAndRender(y);
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootCloudUI);
+  } else {
+    bootCloudUI();
+  }
 })();
 </script>
-<!-- === /Cloud JSON I/O + Status indicator === -->
+<!-- === /Cloud JSON I/O + Status + Year selector === -->
 </body>
 </html>
