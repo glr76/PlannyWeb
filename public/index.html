@@ -1531,49 +1531,89 @@ document.addEventListener('keydown', (e)=>{
 </script>
 
 
-<!-- === CLOUD PATCH FINAL === -->
+<!-- === UNIVERSAL CLOUD INTERCEPT (no UI changes) === -->
 <script>
 (function(){
-  // --- Intercetta tutte le letture file e forza l'uso del server JSON ---
-  const _origFetchText = typeof window.fetchText === 'function'
-    ? window.fetchText.bind(window)
-    : async function(name){
-        try {
-          const r = await fetch(name + '?' + Date.now(), {cache:'no-store'});
-          if (!r.ok) return '';
-          return await r.text();
-        } catch { return ''; }
-      };
+  // Intercetta fetch() per i file chiave e reindirizza alle rotte JSON del server
+  const MUST = /(^|\/)(config\.ini|config\.txt|selections_\d{4}\.txt|festivi_\d{4}\.txt)$/i;
+  const origFetch = window.fetch.bind(window);
 
-  async function getTextFromServerJSON(name){
-    try{
-      const r = await fetch('/api/files/text/' + encodeURIComponent(name) + '?' + Date.now(), {cache:'no-store'});
-      if (!r.ok) return '';
-      const j = await r.json().catch(()=>({ok:false}));
-      return (j && j.ok) ? (j.text || '') : '';
-    }catch{ return ''; }
+  function basename(u){
+    try { return u.split('?')[0].split('#')[0].split('/').pop(); } catch { return u; }
   }
 
-  window.fetchText = async function(name){
-    const mustServer = /^(config\.ini|config\.txt|selections_\d{4}\.txt|festivi_\d{4}\.txt)$/i.test(name);
-    let txt = await getTextFromServerJSON(name);
-    if (txt && txt.length) return txt;
-    if (mustServer) return '';
-    return await _origFetchText(name);
-  };
+  async function serverRead(name){
+    const r = await origFetch('/api/files/text/' + encodeURIComponent(name) + '?' + Date.now(), { cache:'no-store' });
+    if (!r.ok) return new Response('', {status: r.status, headers:{'Content-Type':'text/plain; charset=utf-8'}});
+    const j = await r.json().catch(()=>({ok:false}));
+    if (!j || !j.ok) return new Response('', {status: 404, headers:{'Content-Type':'text/plain; charset=utf-8'}});
+    const txt = j.text || '';
+    return new Response(new Blob([txt], {type:'text/plain; charset=utf-8'}), {status:200, headers:{'Content-Type':'text/plain; charset=utf-8'}});
+  }
 
-  window.putTextToServer = async function(name, content){
-    const r = await fetch('/api/files/text/' + encodeURIComponent(name), {
+  async function serverWrite(name, body){
+    const r = await origFetch('/api/files/text/' + encodeURIComponent(name), {
       method:'PUT',
       headers:{'Content-Type':'text/plain; charset=utf-8'},
-      body: content || ''
+      body: body || ''
+    });
+    const j = await r.json().catch(()=>({ok:r.ok}));
+    const ok = r.ok && j && j.ok !== false;
+    const payload = JSON.stringify(ok ? (j || {ok:true}) : (j || {ok:false}));
+    return new Response(new Blob([payload], {type:'application/json'}), {
+      status: ok ? 200 : (r.status || 500),
+      headers: {'Content-Type':'application/json'}
+    });
+  }
+
+  window.fetch = async function(input, init){
+    try{
+      const url = (typeof input === 'string') ? input : (input && input.url) || '';
+      const isKeyFile = MUST.test(url);
+      if (!isKeyFile) return origFetch(input, init);
+
+      const name = basename(url);
+      const method = (init && init.method ? String(init.method) : 'GET').toUpperCase();
+
+      if (method === 'GET') {
+        return await serverRead(name);
+      } else if (method === 'PUT' || method === 'POST') {
+        const body = init && init.body;
+        return await serverWrite(name, body);
+      }
+    }catch(e){
+      console.warn('[cloud intercept] errore', e);
+    }
+    // fallback default
+    return origFetch(input, init);
+  };
+
+  // Espone anche funzioni helper globali, in caso il tuo codice le usi
+  window.getTextFromServer = async function(name){
+    const r = await origFetch('/api/files/text/' + encodeURIComponent(name) + '?' + Date.now(), {cache:'no-store'});
+    if(!r.ok) return '';
+    const j = await r.json().catch(()=>({ok:false}));
+    return (j && j.ok) ? (j.text || '') : '';
+  };
+  window.putTextToServer = async function(name, content){
+    const r = await origFetch('/api/files/text/' + encodeURIComponent(name), {
+      method:'PUT', headers:{'Content-Type':'text/plain; charset=utf-8'}, body: content || ''
     });
     const j = await r.json().catch(()=>({ok:false}));
-    if (!r.ok || !j.ok) throw new Error('PUT ' + name + ' → ' + r.status);
+    if(!r.ok || !j.ok) throw new Error('HTTP '+r.status);
     return j;
   };
 
-  async function waitApp(maxMs=5000){
+  // Boot minimale: carica selections_<anno>.txt se la tua app non lo ha già fatto
+  function detectYear(){
+    if (window.state && window.state.year) return +window.state.year;
+    const sel = document.querySelector('#year, #anno, #yearSelect, select[name="year"], select[name="anno"], .year-select, .anno-select');
+    if (sel && sel.value) return +sel.value;
+    const saved = +localStorage.getItem('plannyYear') || 0;
+    const now = new Date().getFullYear();
+    return saved || now;
+  }
+  function waitReady(maxMs=5000){
     return new Promise(res=>{
       const t0=Date.now();
       (function tick(){
@@ -1584,30 +1624,19 @@ document.addEventListener('keydown', (e)=>{
       })();
     });
   }
-  function detectYear(){
-    if (window.state && window.state.year) return +window.state.year;
-    const sel = document.querySelector('#year, #anno, #yearSelect, select[name=\"year\"], select[name=\"anno\"], .year-select, .anno-select');
-    if (sel && sel.value) return +sel.value;
-    const saved = +localStorage.getItem('plannyYear') || 0;
-    const now = new Date().getFullYear();
-    return saved || now;
-  }
   async function boot(){
-    const year = detectYear();
-    const ok = await waitApp();
-    const name = `selections_${year}.txt`;
-    const txt = await window.fetchText(name);
-    if (ok){
-      window.importSelectionsFromText(txt || '');
-      window.renderCalendar();
-    } else {
-      console.warn('[Planny] funzioni non pronte; caricato', name, (txt||'').length, 'char');
+    const y = detectYear();
+    // Prova a caricare: se la tua app lo fa già, questa doppia GET verrà cacheata no-store ed è innocua
+    const res = await serverRead('selections_'+y+'.txt');
+    const txt = res.ok ? await res.text() : '';
+    const ok = await waitReady();
+    if (ok && txt!=null){
+      try { window.importSelectionsFromText(txt); window.renderCalendar(); } catch(_){}
     }
   }
-  if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
+  if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
 </script>
-<!-- === /CLOUD PATCH FINAL === -->
+<!-- === /UNIVERSAL CLOUD INTERCEPT === -->
 </body>
 </html>
