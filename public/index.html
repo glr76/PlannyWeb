@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Planny Web – Cloud</title>
   <style>
-    :root { --bg:#0b0f14; --card:#121820; --soft:#1a2330; --text:#e8f0ff; --muted:#9fb3c8; --accent:#7cc4ff; }
+    :root { --bg:#0b0f14; --card:#121820; --soft:#1a2330; --text:#e8f0ff; --muted:#9fb3c8; }
     * { box-sizing:border-box }
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
     header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #223;background:var(--card)}
@@ -18,6 +18,7 @@
     textarea{width:100%;min-height:300px;resize:vertical;background:var(--soft);color:var(--text);border:1px solid #2b394a;border-radius:12px;padding:12px}
     .muted{color:var(--muted);font-size:12px}
     .ok{color:#7CFFB3}.warn{color:#ffd27c}.err{color:#ff7c94}
+    .pill{background:#15202b;border:1px solid #243446;padding:4px 8px;border-radius:999px;font:12px/1 monospace}
   </style>
 </head>
 <body>
@@ -26,7 +27,7 @@
   <div class="right">
     <label for="yearSel" class="muted">Anno</label>
     <select id="yearSel"></select>
-    <span id="fileName" style="font-family:monospace;padding:4px 8px;background:#15202b;border:1px solid #243446;border-radius:999px"></span>
+    <span id="fileName" class="pill"></span>
     <button id="reloadBtn">Ricarica</button>
     <button id="saveBtn">Salva</button>
     <span id="status" class="muted"></span>
@@ -50,57 +51,108 @@
 <script>
 const API='/api/files/';
 const $=s=>document.querySelector(s);
-const yearSel=$('#yearSel'),fileName=$('#fileName'),txtBox=$('#txtBox'),statusEl=$('#status');
-const cfgBox=$('#cfgBox'),cfgStatus=$('#cfgStatus');
+const yearSel=$('#yearSel'), fileName=$('#fileName'), txtBox=$('#txtBox'), statusEl=$('#status');
+const cfgBox=$('#cfgBox'), cfgStatus=$('#cfgStatus');
 
-const fname=y=>`selections_${y}.txt`;
-const bust=()=>'?ts='+Date.now();
+const fname = y => `selections_${String(y).trim()}.txt`;
+const bust  = () => '?ts=' + Date.now();
 const setStatus=(el,txt,cls='muted')=>{el.className=cls;el.textContent=txt};
 
-async function apiGet(n){const r=await fetch(API+encodeURIComponent(n)+bust(),{cache:'no-store'});if(!r.ok)throw new Error(r.status);return await r.text()}
-async function apiPut(n,t){const r=await fetch(API+encodeURIComponent(n),{method:'PUT',body:t??''});return await r.json()}
+async function apiGet(n){
+  const r=await fetch(API+encodeURIComponent(n)+bust(),{cache:'no-store'});
+  if(!r.ok) throw new Error('GET '+n+' → '+r.status);
+  return await r.text();
+}
+async function apiPut(n,t){
+  const r=await fetch(API+encodeURIComponent(n),{method:'PUT',body:t??''});
+  let b=null; try{ b=await r.json() }catch(e){}
+  if(!r.ok || !b || b.ok!==true) throw new Error('PUT '+n+' → '+r.status);
+  return b;
+}
 
 function populateYears(){
   const now=new Date().getFullYear();
   const ys=[now-1,now,now+1,now+2];
-  yearSel.innerHTML=ys.map(y=>`<option>${y}</option>`).join('');
+  yearSel.innerHTML=ys.map(y=>`<option value="${y}">${y}</option>`).join('');
   const saved=localStorage.getItem('plannyYear');
-  yearSel.value=saved&&ys.includes(+saved)?saved:now;
-  updateFile();
+  yearSel.value=(saved && ys.includes(Number(saved))) ? saved : now;
 }
+
 function updateFile(){
   const y=yearSel.value;
-  localStorage.setItem('plannyYear',y);
-  fileName.textContent=fname(y);
-  return fname(y);
+  localStorage.setItem('plannyYear', y);
+  const f=fname(y);
+  fileName.textContent=f;
+  return f;
 }
+
 async function loadSel(){
   const f=updateFile();
-  try{setStatus(statusEl,'Carico...');txtBox.value=await apiGet(f);setStatus(statusEl,'Caricato','ok')}
-  catch{txtBox.value='';setStatus(statusEl,'Nuovo file','warn')}
+  try{
+    setStatus(statusEl,'Caricamento…');
+    txtBox.value=await apiGet(f);
+    setStatus(statusEl,'Caricato ✔','ok');
+  }catch{
+    txtBox.value='';
+    setStatus(statusEl,'Nuovo file (vuoto)','warn');
+  }
 }
+
 async function saveSel(){
-  const f=updateFile(),t=txtBox.value;
-  try{setStatus(statusEl,'Salvo...');const r=await apiPut(f,t);setStatus(statusEl,'Salvato '+(r.size||'')+'B','ok')}
-  catch(e){setStatus(statusEl,e.message,'err')}
+  const f=updateFile(), t=txtBox.value;
+  try{
+    setStatus(statusEl,'Salvataggio…');
+    const res=await apiPut(f,t);
+    setStatus(statusEl,`Salvato (${res.size} byte) ✔`,'ok');
+    // rilettura di conferma (no cache)
+    const check=await apiGet(f);
+    if(check!==t) setStatus(statusEl,'Attenzione: rilettura diversa dal salvato','warn');
+  }catch(e){
+    console.error(e);
+    setStatus(statusEl,e.message,'err');
+  }
 }
+
 async function loadCfg(){
-  try{setStatus(cfgStatus,'Carico...');cfgBox.value=await apiGet('config.txt');setStatus(cfgStatus,'Caricato','ok')}
-  catch{cfgBox.value='';setStatus(cfgStatus,'Nuovo','warn')}
+  try{
+    setStatus(cfgStatus,'Carico…');
+    cfgBox.value=await apiGet('config.txt');
+    setStatus(cfgStatus,'Caricato ✔','ok');
+  }catch{
+    cfgBox.value='';
+    setStatus(cfgStatus,'Nuovo','warn');
+  }
 }
 async function saveCfg(){
-  try{setStatus(cfgStatus,'Salvo...');const r=await apiPut('config.txt',cfgBox.value);setStatus(cfgStatus,'Salvato','ok')}
-  catch(e){setStatus(cfgStatus,e.message,'err')}
+  try{
+    setStatus(cfgStatus,'Salvo…');
+    const res=await apiPut('config.txt', cfgBox.value);
+    setStatus(cfgStatus,`Salvato (${res.size} byte) ✔`,'ok');
+  }catch(e){
+    console.error(e);
+    setStatus(cfgStatus,e.message,'err');
+  }
 }
 
-yearSel.onchange=loadSel;
-$('#reloadBtn').onclick=loadSel;
-$('#saveBtn').onclick=saveSel;
-$('#reloadCfg').onclick=loadCfg;
-$('#saveCfg').onclick=saveCfg;
-window.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();saveSel()}});
+// eventi
+yearSel.addEventListener('change', loadSel);
+$('#reloadBtn').addEventListener('click', loadSel);
+$('#saveBtn').addEventListener('click', saveSel);
+$('#reloadCfg').addEventListener('click', loadCfg);
+$('#saveCfg').addEventListener('click', saveCfg);
+// scorciatoia Ctrl/Cmd+S
+window.addEventListener('keydown', e=>{
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='s'){
+    e.preventDefault(); saveSel();
+  }
+});
 
-(async()=>{populateYears();await loadSel();await loadCfg();})();
+// init
+(async()=>{
+  populateYears();
+  await loadSel();
+  await loadCfg();
+})();
 </script>
 </body>
 </html>
