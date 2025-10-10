@@ -1531,40 +1531,45 @@ document.addEventListener('keydown', (e)=>{
 </script>
 
 
-<!-- ==== Planny Cloud Adapter (Supabase via Flask /api/files) ==== -->
+<!-- ==== Planny Cloud Adapter + Year Selector (Supabase via /api/files) ==== -->
+<style>
+  /* mini stile non invasivo per il selettore anno */
+  #cloud-year-box{display:flex;gap:6px;align-items:center}
+  #cloud-year-box label{opacity:.8;font-size:12px}
+  #cloud-year-box select{padding:4px 8px;border-radius:6px;border:1px solid #c8ced8}
+  #cloud-year-badge{font:12px monospace;opacity:.7}
+</style>
 <script>
 (function(){
   const API = '/api/files/';
-  const bust = () => '?ts=' + Date.now();
-  const fname = (y) => `selections_${String(y).trim()}.txt`;
   const CFG = ['config.ini','config.txt'];
+  const bust = () => '?ts=' + Date.now();
+  const fname = y => `selections_${String(y).trim()}.txt`;
 
   async function apiGet(n){
     const r = await fetch(API + encodeURIComponent(n) + bust(), { cache:'no-store' });
-    if(r.status === 404) return null;
-    if(!r.ok) throw new Error('GET '+n+' -> '+r.status);
+    if (r.status === 404) return null;
+    if (!r.ok) throw new Error('GET '+n+' → '+r.status);
     return await r.text();
   }
   async function apiPut(n, txt){
     const r = await fetch(API + encodeURIComponent(n), { method:'PUT', body: txt ?? '' });
-    if(!r.ok) throw new Error('PUT '+n+' -> '+r.status);
-    try{ return await r.json(); }catch{ return {ok:true}; }
+    if (!r.ok) throw new Error('PUT '+n+' → '+r.status);
+    try { return await r.json(); } catch { return { ok:true }; }
   }
 
   window.Cloud = {
     async readSelections(year){
-      const name = fname(year);
-      const txt = await apiGet(name);
-      return txt ?? '';
+      const t = await apiGet(fname(year));
+      return t ?? '';
     },
     async saveSelections(year, text){
-      const name = fname(year);
-      return await apiPut(name, text || '');
+      return await apiPut(fname(year), text || '');
     },
     async readConfig(){
-      for(const n of CFG){
+      for (const n of CFG){
         const t = await apiGet(n);
-        if(t !== null) return { name:n, text:t };
+        if (t !== null) return { name:n, text:t };
       }
       return { name: CFG[0], text: '' };
     },
@@ -1575,52 +1580,122 @@ document.addEventListener('keydown', (e)=>{
     }
   };
 
-  function boot(){
-    if(!window.state){ setTimeout(boot, 50); return; }
-    const y = window.state.year || new Date().getFullYear();
-    window.Cloud.readSelections(y).then(txt => {
-      if(typeof window.importSelectionsFromText === 'function'){
-        window.importSelectionsFromText(txt || '');
-      }
-      if(typeof window.renderCalendar === 'function'){
-        window.renderCalendar();
-      }
-    }).catch(err => console.warn('Cloud bootstrap read error:', err));
-
-    window.Cloud.readConfig().then(({name,text}) => {
-      window.Cloud._lastCfgName = name;
-      if(window.applyConfigFromText){
-        try{ window.applyConfigFromText(text); }catch(_){}
-      }
-    }).catch(()=>{});
+  // Parser semplice: "anni=2025,2026,2027" in ini/txt
+  function parseIniYears(txt){
+    const m = (txt||'').match(/^\s*anni\s*=\s*([0-9,\s]+)\s*$/im);
+    if(!m) return null;
+    return m[1].split(',').map(s=>s.trim()).filter(Boolean).map(Number);
   }
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
+
+  function installYearSelector(years){
+    if (document.getElementById('cloud-year-select')) return;
+
+    // Trova una toolbar dove inserirlo (prova vari container comuni)
+    let host = document.querySelector('#toolbar, .toolbar, header, .topbar');
+    if (!host) host = document.body.firstElementChild || document.body;
+
+    const box = document.createElement('div');
+    box.id = 'cloud-year-box';
+    box.style.margin = '6px 8px';
+
+    const label = document.createElement('label');
+    label.textContent = 'Anno';
+    label.htmlFor = 'cloud-year-select';
+
+    const sel = document.createElement('select');
+    sel.id = 'cloud-year-select';
+
+    const badge = document.createElement('span');
+    badge.id = 'cloud-year-badge';
+
+    box.appendChild(label);
+    box.appendChild(sel);
+    box.appendChild(badge);
+
+    // Inserisci in testa alla toolbar
+    if (host.firstChild) host.insertBefore(box, host.firstChild);
+    else host.appendChild(box);
+
+    // Popola anni
+    const now = new Date().getFullYear();
+    const list = (years && years.length ? years : [now-1, now, now+1, now+2]);
+    sel.innerHTML = list.map(y => `<option value="${y}">${y}</option>`).join('');
+
+    // Imposta valore (saved -> state.year -> now)
+    const saved = localStorage.getItem('plannyYear');
+    const target = (saved && list.includes(+saved)) ? +saved :
+                   (window.state && window.state.year && list.includes(+window.state.year) ? +window.state.year : now);
+    sel.value = String(target);
+    localStorage.setItem('plannyYear', sel.value);
+    window.state = window.state || {};
+    window.state.year = +sel.value;
+    badge.textContent = fname(sel.value);
+
+    sel.addEventListener('change', async () => {
+      window.state.year = +sel.value;
+      localStorage.setItem('plannyYear', sel.value);
+      badge.textContent = fname(sel.value);
+      await reloadSelectionsFromCloud();
+    });
+  }
 
   window.saveSelectionsToCloud = async function(){
     const y = window.state?.year || new Date().getFullYear();
     let text = '';
-    try{ text = (typeof window.selectionsToText === 'function') ? window.selectionsToText() : ''; }catch(_){}
-    if(!text && window.state && window.state.selections){
-      const arr = Array.from(window.state.selections.entries()).map(([k,v]) => k+','+v);
-      text = arr.join('\\n') + '\\n';
-    }
+    try{
+      if (typeof window.selectionsToText === 'function') text = window.selectionsToText();
+    }catch{}
     await window.Cloud.saveSelections(y, text);
-    console.log('[Cloud] Selections salvati:', y);
+    console.log('[Cloud] Salvato selections_'+y+'.txt');
   };
 
   window.reloadSelectionsFromCloud = async function(){
     const y = window.state?.year || new Date().getFullYear();
     const txt = await window.Cloud.readSelections(y);
-    if(typeof window.importSelectionsFromText === 'function'){
+    if (typeof window.importSelectionsFromText === 'function') {
       window.importSelectionsFromText(txt || '');
     }
-    if(typeof window.renderCalendar === 'function'){
-      window.renderCalendar();
-    }
-    console.log('[Cloud] Selections ricaricati:', y);
+    if (typeof window.renderCalendar === 'function') window.renderCalendar();
+    console.log('[Cloud] Ricaricato selections_'+y+'.txt');
   };
+
+  async function boot(){
+    // Prepara state/year
+    window.state = window.state || {};
+    if (!window.state.year) {
+      const saved = localStorage.getItem('plannyYear');
+      window.state.year = saved ? +saved : (new Date().getFullYear());
+    }
+
+    // Config -> anni (se presenti)
+    let yearsFromCfg = null;
+    try{
+      const { name, text } = await window.Cloud.readConfig();
+      window.Cloud._lastCfgName = name;
+      if (typeof window.applyConfigFromText === 'function') {
+        try { window.applyConfigFromText(text); } catch(_){}
+      }
+      yearsFromCfg = parseIniYears(text);
+    }catch{}
+
+    installYearSelector(yearsFromCfg);
+
+    // Carica selections iniziali
+    try{
+      const txt = await window.Cloud.readSelections(window.state.year);
+      if (typeof window.importSelectionsFromText === 'function') {
+        window.importSelectionsFromText(txt || '');
+      }
+      if (typeof window.renderCalendar === 'function') window.renderCalendar();
+    }catch(e){
+      console.warn('Cloud bootstrap error:', e);
+    }
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
 })();
 </script>
+<!-- ==== /Planny Cloud Adapter ==== -->
 </body>
 </html>
