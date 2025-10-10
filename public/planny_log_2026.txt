@@ -1,2 +1,0 @@
-[9/14/2025, 12:45:15 PM] Sessione avviata su http://localhost:8000/
-[9/25/2025, 10:53:38 AM] Sessione avviata su http://127.0.0.1:8000/
