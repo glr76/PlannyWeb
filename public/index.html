@@ -3,172 +3,392 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Planny Cloud</title>
+  <title>Planny Cloud — Calendario</title>
   <style>
     :root {
-      --bg:#0b0f14;--card:#121820;--soft:#1a2330;
-      --text:#e8f0ff;--muted:#9fb3c8;--ok:#7cffb3;
-      --warn:#ffd27c;--err:#ff7c94;
+      --bg:#0b0f14; --card:#121820; --soft:#1a2330;
+      --text:#e8f0ff; --muted:#9fb3c8; --ok:#7cffb3;
+      --warn:#ffd27c; --err:#ff7c94; --grid:#1e2633; --accent:#7cc4ff;
     }
     *{box-sizing:border-box}
     body{margin:0;background:var(--bg);color:var(--text);
          font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
-    header{display:flex;align-items:center;justify-content:space-between;
+    header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
            padding:12px 18px;background:var(--card);border-bottom:1px solid #223}
     h1{font-size:18px;margin:0}
-    .right{display:flex;align-items:center;gap:8px}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
     select,button{
       background:var(--soft);color:var(--text);
       border:1px solid #2b394a;border-radius:8px;
       padding:6px 10px;font-size:14px
     }
     button{cursor:pointer}
-    main{padding:18px}
-    .card{
-      background:var(--card);border:1px solid #223;
-      border-radius:12px;padding:14px;margin-bottom:22px
-    }
-    textarea{
-      width:100%;min-height:280px;background:var(--soft);
-      color:var(--text);border:1px solid #2b394a;border-radius:10px;
-      padding:10px;resize:vertical;font-family:monospace;font-size:13px
-    }
+    .pill{background:#15202b;border:1px solid #243446;border-radius:999px;
+          padding:4px 10px;font:12px monospace}
     .muted{color:var(--muted);font-size:12px}
-    .pill{
-      background:#15202b;border:1px solid #243446;
-      border-radius:999px;padding:4px 10px;font:12px monospace
+    .ok{color:var(--ok)} .warn{color:var(--warn)} .err{color:var(--err)}
+
+    main{padding:18px;display:grid;grid-template-columns:1fr;gap:18px}
+    @media (min-width: 1000px){ main{grid-template-columns: 2fr 1fr} }
+
+    .card{background:var(--card);border:1px solid #223;border-radius:12px;padding:14px}
+    .card h2{margin:0 0 10px 0;font-size:16px}
+
+    /* Calendario */
+    .calendar{display:grid;grid-template-rows:auto 1fr;gap:10px}
+    .weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+    .weekdays div{padding:8px;text-align:center;color:var(--muted);font-size:12px}
+    .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+    .day{
+      border:1px solid var(--grid); border-radius:10px; min-height:110px;
+      padding:8px; background:var(--soft); display:flex;flex-direction:column;gap:6px
     }
-    .ok{color:var(--ok)}.warn{color:var(--warn)}.err{color:var(--err)}
+    .day.holiday{outline:1px dashed #344; background:#16202c}
+    .day .num{font:12px/1 monospace;opacity:.85}
+    .item{
+      font-size:12px; padding:4px 6px; border-radius:6px;
+      border:1px solid #2a3a4f; background:#15202b
+    }
+
+    textarea{
+      width:100%;min-height:220px;background:var(--soft);
+      color:var(--text);border:1px solid #2b394a;border-radius:10px;
+      padding:10px;resize:vertical;font-family:ui-monospace,Consolas,Menlo,monospace;font-size:12px
+    }
+
     #toast{
       position:fixed;bottom:20px;right:20px;
       background:var(--card);border:1px solid #2b394a;
       padding:8px 14px;border-radius:8px;
-      color:var(--ok);opacity:0;transition:opacity .3s
+      color:var(--ok);opacity:0;transition:opacity .25s
     }
+    .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   </style>
 </head>
 <body>
-<header>
-  <h1>Planny Cloud</h1>
-  <div class="right">
-    <label for="yearSel" class="muted">Anno</label>
-    <select id="yearSel"></select>
-    <span id="fileName" class="pill"></span>
-    <button id="reloadBtn">Ricarica</button>
-    <button id="saveBtn">Salva</button>
-    <span id="status" class="muted"></span>
-  </div>
-</header>
+  <header>
+    <h1>Planny Cloud</h1>
+    <div class="row">
+      <label class="muted">Anno</label>
+      <select id="yearSel"></select>
+      <label class="muted">Mese</label>
+      <select id="monthSel"></select>
+      <span id="fileName" class="pill"></span>
+    </div>
+    <div class="row">
+      <button id="reloadBtn">Ricarica</button>
+      <button id="saveBtn">Salva</button>
+      <span id="status" class="muted"></span>
+    </div>
+  </header>
 
-<main>
-  <div class="card">
-    <h2>Selections</h2>
-    <textarea id="txtBox" spellcheck="false" placeholder="Contenuto di selections_YYYY.txt..."></textarea>
-  </div>
+  <main>
+    <!-- Calendario grafico -->
+    <section class="card">
+      <div class="toolbar">
+        <h2 style="margin-right:auto">Calendario</h2>
+        <span class="muted">Doppio click su un giorno per aggiungere una riga (DD-MM-YYYY,Nome,Tipo)</span>
+      </div>
+      <div class="calendar">
+        <div class="weekdays">
+          <div>Lun</div><div>Mar</div><div>Mer</div><div>Gio</div><div>Ven</div><div>Sab</div><div>Dom</div>
+        </div>
+        <div id="grid" class="grid"></div>
+      </div>
+    </section>
 
-  <div class="card">
-    <h2>Config (config.ini)</h2>
-    <textarea id="cfgBox" spellcheck="false"></textarea><br>
-    <button id="reloadCfg">Ricarica config</button>
-    <button id="saveCfg">Salva config</button>
-    <span id="cfgStatus" class="muted"></span>
-  </div>
-</main>
+    <!-- Pannello RAW file e Config -->
+    <section class="card">
+      <h2>File RAW (selections_YYYY.txt)</h2>
+      <textarea id="txtBox" placeholder="Contenuto grezzo del file selections_YYYY.txt..."></textarea>
+      <div class="row" style="margin-top:8px">
+        <button id="saveRaw">Salva RAW</button>
+        <button id="reloadRaw">Ricarica RAW</button>
+        <span class="muted">Usa questo per modifiche massicce o copia/incolla</span>
+      </div>
+      <hr style="border:none;border-top:1px solid #2b394a;margin:16px 0">
+      <h2>Config (config.ini → fallback config.txt)</h2>
+      <textarea id="cfgBox" placeholder="[generale]\nanni=2025,2026\n..."></textarea>
+      <div class="row" style="margin-top:8px">
+        <button id="reloadCfg">Ricarica config</button>
+        <button id="saveCfg">Salva config</button>
+        <span id="cfgStatus" class="muted"></span>
+      </div>
+    </section>
+  </main>
 
-<div id="toast">✔ Salvato</div>
+  <div id="toast">✔ Salvato</div>
 
-<script>
-const API='/api/files/';
-const $=s=>document.querySelector(s);
-const yearSel=$('#yearSel'),fileName=$('#fileName'),
-      txtBox=$('#txtBox'),statusEl=$('#status'),
-      cfgBox=$('#cfgBox'),cfgStatus=$('#cfgStatus'),toast=$('#toast');
+  <script>
+    /* ===================== API BASE ===================== */
+    const API = '/api/files/';
+    const $ = s => document.querySelector(s);
+    const yearSel = $('#yearSel'), monthSel = $('#monthSel');
+    const fileName = $('#fileName'), grid = $('#grid');
+    const txtBox = $('#txtBox'), statusEl = $('#status');
+    const cfgBox = $('#cfgBox'), cfgStatus = $('#cfgStatus'), toast = $('#toast');
 
-const fname=y=>`selections_${y}.txt`;
-const bust=()=>'?ts='+Date.now();
-const setStatus=(el,txt,cls='muted')=>{el.className=cls;el.textContent=txt};
-const showToast=(msg,cls='ok')=>{
-  toast.textContent=msg;
-  toast.style.color=getComputedStyle(document.documentElement).getPropertyValue(`--${cls}`);
-  toast.style.opacity='1';
-  setTimeout(()=>toast.style.opacity='0',2000);
-};
+    const MONTHS = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+    const fname = y => `selections_${String(y).trim()}.txt`;
+    const bust  = () => '?ts=' + Date.now();
+    const setStatus=(el,txt,cls='muted')=>{ el.className=cls; el.textContent=txt; };
+    const showToast=(msg,kind='ok')=>{
+      toast.textContent = msg;
+      const css = getComputedStyle(document.documentElement);
+      toast.style.color = css.getPropertyValue(kind==='ok'?'--ok':kind==='warn'?'--warn':'--err');
+      toast.style.opacity = '1'; setTimeout(()=> toast.style.opacity='0', 1600);
+    };
 
-async function apiGet(n){
-  const r=await fetch(API+encodeURIComponent(n)+bust(),{cache:'no-store'});
-  if(!r.ok) throw new Error(r.status);
-  return await r.text();
-}
-async function apiPut(n,t){
-  const r=await fetch(API+encodeURIComponent(n),{method:'PUT',body:t??''});
-  return await r.json();
-}
+    async function apiGet(n){
+      const r = await fetch(API + encodeURIComponent(n) + bust(), { cache:'no-store' });
+      if(!r.ok) throw new Error('GET '+n+' → '+r.status);
+      return await r.text();
+    }
+    async function apiPut(n,t){
+      const r = await fetch(API + encodeURIComponent(n), { method:'PUT', body:t ?? '' });
+      let b=null; try{ b=await r.json(); } catch(e){}
+      if(!r.ok || !b || b.ok !== true) throw new Error('PUT '+n+' → '+r.status);
+      return b;
+    }
 
-function populateYears(){
-  const now=new Date().getFullYear();
-  const ys=[now-1,now,now+1,now+2];
-  yearSel.innerHTML=ys.map(y=>`<option>${y}</option>`).join('');
-  const saved=localStorage.getItem('plannyYear');
-  yearSel.value=saved && ys.includes(+saved)?saved:now;
-  updateFile();
-}
-function updateFile(){
-  const y=yearSel.value;
-  localStorage.setItem('plannyYear',y);
-  const f=fname(y);
-  fileName.textContent=f;
-  return f;
-}
+    /* ===================== PARSER ===================== */
+    // Formato riga: DD-MM-YYYY,Nome,Tipo
+    function parseLines(txt){
+      const rows = [];
+      (txt||'').split(/\r?\n/).forEach(line=>{
+        const s = line.trim();
+        if(!s) return;
+        const parts = s.split(',');
+        if(parts.length < 3) return;
+        const [dmy, name, type] = [parts[0].trim(), parts[1].trim(), parts.slice(2).join(',').trim()];
+        const m = dmy.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+        if(!m) return;
+        const [_, dd, mm, yyyy] = m;
+        rows.push({ dd:+dd, mm:+mm, yyyy:+yyyy, name, type, raw: s });
+      });
+      return rows;
+    }
 
-async function loadSel(){
-  const f=updateFile();
-  try{setStatus(statusEl,'Carico...');txtBox.value=await apiGet(f);
-      setStatus(statusEl,'Caricato','ok')}
-  catch{txtBox.value='';setStatus(statusEl,'Nuovo file','warn')}
-}
-async function saveSel(){
-  const f=updateFile(),t=txtBox.value;
-  try{
-    setStatus(statusEl,'Salvo...');
-    const res=await apiPut(f,t);
-    setStatus(statusEl,'Salvato ✔','ok');showToast(`Salvato ${f}`,'ok');
-  }catch(e){setStatus(statusEl,e.message,'err')}
-}
+    function formatLine(dd,mm,yyyy,name,type){
+      const pad = n => String(n).padStart(2,'0');
+      return `${pad(dd)}-${pad(mm)}-${yyyy},${name},${type}`;
+    }
 
-const CFG_NAMES=['config.ini','config.txt'];
-let currentCfg=localStorage.getItem('cfgName')||CFG_NAMES[0];
+    /* ===================== UI: ANNO/MESE ===================== */
+    function populateYears(availableYears=null){
+      // se config.ini contiene "anni=2025,2026" uso quelli; altrimenti default ±2
+      let years;
+      if(Array.isArray(availableYears) && availableYears.length){
+        years = availableYears.map(y => +y).sort((a,b)=>a-b);
+      } else {
+        const now = new Date().getFullYear();
+        years = [now-1, now, now+1, now+2];
+      }
+      yearSel.innerHTML = years.map(y=>`<option value="${y}">${y}</option>`).join('');
+      const saved = localStorage.getItem('plannyYear');
+      yearSel.value = (saved && years.includes(+saved)) ? saved : (new Date().getFullYear());
+    }
 
-async function loadCfg(){
-  for(const n of CFG_NAMES){
-    try{
-      setStatus(cfgStatus,`Carico ${n}...`);
-      cfgBox.value=await apiGet(n);
-      currentCfg=n;localStorage.setItem('cfgName',n);
-      setStatus(cfgStatus,`Caricato ${n}`,'ok');return;
-    }catch{}
-  }
-  cfgBox.value='';setStatus(cfgStatus,'Config non trovato','warn');
-}
-async function saveCfg(){
-  try{
-    setStatus(cfgStatus,'Salvo...');
-    const res=await apiPut(currentCfg,cfgBox.value);
-    setStatus(cfgStatus,`Salvato ${currentCfg}`,'ok');
-    showToast(`Config ${currentCfg} salvato`,'ok');
-  }catch(e){setStatus(cfgStatus,e.message,'err')}
-}
+    function populateMonths(){
+      monthSel.innerHTML = MONTHS.map((m,i)=>`<option value="${i+1}">${m}</option>`).join('');
+      const saved = localStorage.getItem('plannyMonth');
+      const cur = saved ? +saved : (new Date().getMonth()+1);
+      monthSel.value = String(cur);
+    }
 
-yearSel.onchange=loadSel;
-$('#reloadBtn').onclick=loadSel;
-$('#saveBtn').onclick=saveSel;
-$('#reloadCfg').onclick=loadCfg;
-$('#saveCfg').onclick=saveCfg;
+    function updateFileBadge(){
+      localStorage.setItem('plannyYear', yearSel.value);
+      localStorage.setItem('plannyMonth', monthSel.value);
+      const f = fname(yearSel.value);
+      fileName.textContent = f;
+      return f;
+    }
 
-window.addEventListener('keydown',e=>{
-  if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();saveSel();}
-});
+    /* ===================== CALENDARIO ===================== */
+    function buildMatrix(y,m){ // m: 1..12
+      const first = new Date(y, m-1, 1);
+      const startWeekday = (first.getDay()+6)%7; // L=0..D=6
+      const daysInMonth = new Date(y, m, 0).getDate();
+      const cells = [];
+      for(let i=0;i<startWeekday;i++) cells.push(null);
+      for(let d=1; d<=daysInMonth; d++) cells.push({d});
+      // riempi fino a 6 righe*7 col
+      while(cells.length % 7 !== 0) cells.push(null);
+      while(cells.length < 42) cells.push(null);
+      return cells;
+    }
 
-(async()=>{populateYears();await loadSel();await loadCfg();})();
-</script>
+    function renderCalendar(rows){
+      const y = +yearSel.value, m = +monthSel.value;
+      const byDay = {};
+      rows.forEach(r=>{
+        if(r.yyyy===y && r.mm===m){
+          const key=r.dd; (byDay[key]||(byDay[key]=[])).push(r);
+        }
+      });
+
+      grid.innerHTML = '';
+      const cells = buildMatrix(y,m);
+      cells.forEach((cell, idx)=>{
+        const div = document.createElement('div');
+        div.className = 'day';
+        if(!cell){
+          div.style.opacity = .25;
+          grid.appendChild(div);
+          return;
+        }
+        const n = document.createElement('div');
+        n.className='num'; n.textContent = String(cell.d).padStart(2,'0');
+        div.appendChild(n);
+
+        const items = byDay[cell.d] || [];
+        items.forEach(r=>{
+          const it = document.createElement('div');
+          it.className='item';
+          it.textContent = `${r.name}${r.type? ' • '+r.type:''}`;
+          div.appendChild(it);
+        });
+
+        // Doppio click: aggiungi riga base
+        div.addEventListener('dblclick', ()=>{
+          const name = prompt('Nome (es. Alfredo):','');
+          if(name===null) return;
+          const type = prompt('Tipo (es. Ferie / PM):','') || '';
+          // Aggiorna RAW e ricarica
+          const line = formatLine(cell.d, m, y, name.trim(), type.trim());
+          const cur = (txtBox.value||'').trim();
+          txtBox.value = (cur ? (cur + '\n') : '') + line;
+          showToast('Riga aggiunta (non ancora salvata)','warn');
+          // re-render anteprima locale
+          const parsed = parseLines(txtBox.value);
+          renderCalendar(parsed);
+        });
+
+        grid.appendChild(div);
+      });
+    }
+
+    /* ===================== CARICO/SALVO ===================== */
+    async function loadSelections(){
+      const f = updateFileBadge();
+      try{
+        setStatus(statusEl,'Carico…');
+        const txt = await apiGet(f);
+        txtBox.value = txt;
+        const rows = parseLines(txt);
+        renderCalendar(rows);
+        setStatus(statusEl,'Caricato ✔','ok');
+      } catch {
+        txtBox.value = '';
+        renderCalendar([]); // mese vuoto
+        setStatus(statusEl,'Nuovo file (vuoto)','warn');
+      }
+    }
+
+    async function saveSelections(){
+      const f = updateFileBadge();
+      try{
+        setStatus(statusEl,'Salvo…');
+        const res = await apiPut(f, txtBox.value);
+        setStatus(statusEl,`Salvato (${res.size||0} B) ✔`,'ok');
+        showToast(`Salvato ${f}`,'ok');
+        // rilettura di conferma
+        const txt = await apiGet(f);
+        txtBox.value = txt;
+        renderCalendar(parseLines(txt));
+      }catch(e){
+        console.error(e); setStatus(statusEl,e.message,'err');
+      }
+    }
+
+    // RAW helpers
+    async function reloadRaw(){ await loadSelections(); }
+    async function saveRaw(){ await saveSelections(); }
+
+    // Config ini/txt
+    const CFG_NAMES = ['config.ini','config.txt'];
+    let currentCfg = localStorage.getItem('cfgName') || CFG_NAMES[0];
+
+    function parseIniYears(iniText){
+      // cerca riga tipo: anni=2025,2026,2027
+      const m = iniText.match(/^\s*anni\s*=\s*([0-9,\s]+)\s*$/im);
+      if(!m) return null;
+      return m[1].split(',').map(s=>s.trim()).filter(Boolean);
+    }
+
+    async function loadConfig(){
+      for(const name of CFG_NAMES){
+        try{
+          setStatus(cfgStatus,`Carico ${name}…`);
+          const txt = await apiGet(name);
+          cfgBox.value = txt;
+          currentCfg = name; localStorage.setItem('cfgName', name);
+          setStatus(cfgStatus,`Caricato ${name} ✔`,'ok');
+          // Se ha anni custom, ripopola select senza perdere selezione attuale se presente
+          const ys = parseIniYears(txt);
+          const prev = yearSel.value;
+          if(ys && ys.length){
+            populateYears(ys);
+            if(ys.includes(prev)) yearSel.value = prev;
+            updateFileBadge();
+          }
+          return;
+        }catch{}
+      }
+      cfgBox.value=''; setStatus(cfgStatus,'Config non trovato (ini/txt)','warn');
+    }
+
+    async function saveConfig(){
+      try{
+        setStatus(cfgStatus,'Salvo…');
+        const res = await apiPut(currentCfg, cfgBox.value);
+        setStatus(cfgStatus,`Salvato ${currentCfg} ✔`,'ok');
+        showToast(`Config ${currentCfg} salvato`,'ok');
+        // Rileggi anni da config ed eventualmente ripopola
+        const ys = parseIniYears(cfgBox.value);
+        if(ys && ys.length){
+          const keep = yearSel.value;
+          populateYears(ys);
+          if(ys.includes(keep)) yearSel.value = keep;
+          updateFileBadge(); await loadSelections();
+        }
+      }catch(e){
+        console.error(e); setStatus(cfgStatus,e.message,'err');
+      }
+    }
+
+    /* ===================== EVENTI ===================== */
+    $('#reloadBtn').addEventListener('click', loadSelections);
+    $('#saveBtn').addEventListener('click', saveSelections);
+
+    $('#reloadRaw').addEventListener('click', reloadRaw);
+    $('#saveRaw').addEventListener('click', saveRaw);
+
+    $('#reloadCfg').addEventListener('click', loadConfig);
+    $('#saveCfg').addEventListener('click', saveConfig);
+
+    yearSel.addEventListener('change', loadSelections);
+    monthSel.addEventListener('change', ()=> {
+      localStorage.setItem('plannyMonth', monthSel.value);
+      renderCalendar(parseLines(txtBox.value));
+    });
+
+    window.addEventListener('keydown', e=>{
+      if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='s'){ e.preventDefault(); saveSelections(); }
+    });
+
+    /* ===================== INIT ===================== */
+    (async function init(){
+      // anni da config se disponibili (caricati dopo), fallback ±2
+      populateYears(null);
+      populateMonths();
+      // ripristina mese salvato
+      const savedM = localStorage.getItem('plannyMonth');
+      if(savedM) monthSel.value = savedM;
+      updateFileBadge();
+      await loadSelections();
+      await loadConfig();
+    })();
+  </script>
 </body>
 </html>
