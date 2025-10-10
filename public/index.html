@@ -443,7 +443,7 @@ td, th {padding: 2px 4px;}
   async function loadHolidaysFromLocalOrWeb(){
     const fname = `festivi_${state.year}.txt`;
     try{
-      const txt = await fetchText(fname);
+      const txt = await getTextFromServer(fname) || await fetchText(fname);
       if (txt){
         const set = new Set();
         txt.split(/\r?\n/).forEach(line=>{
@@ -1457,7 +1457,7 @@ document.addEventListener('keydown', (e)=>{
     if(location.protocol==='file:') log('Aperto via file:// – usa il server Flask per salvataggi automatici.','warn');
 
     try{
-      const cfg=await fetchText('config.ini');
+      const cfg=await getTextFromServer('config.ini') || await fetchText('config.ini');
       if(cfg){
         const ini=parseIni(cfg);
         if(ini['Anno']?.['year']) $('#year').value=ini['Anno']['year'];
@@ -1465,7 +1465,7 @@ document.addEventListener('keydown', (e)=>{
         if(ini['Linac']?.['options']) $('#options').value=ini['Linac']['options'];
       }
       if(!$('#year').value){
-        const cfgTxt = await fetchText('config.txt');
+        const cfgTxt = await getTextFromServer('config.txt') || await fetchText('config.txt');
         if(cfgTxt){
           const y = parseYearFromConfigTxt(cfgTxt);
           if(y){ $('#year').value = y; log('Anno letto da config.txt: '+y,'ok'); }
@@ -1479,7 +1479,7 @@ document.addEventListener('keydown', (e)=>{
       await loadHolidaysFromLocalOrWeb();
 
       const selName = selectionsFileName();
-      const selTxt = await fetchText(selName);
+      const selTxt = await getTextFromServer(selName) || await fetchText(selName);
       if(selTxt){ importSelectionsFromText(selTxt); log('Caricato '+selName,'ok'); }
       else {
         let ls=''; try{ ls = localStorage.getItem('selections_'+state.year) || ''; }catch(_){ ls=''; }
@@ -1531,10 +1531,9 @@ document.addEventListener('keydown', (e)=>{
 </script>
 
 
-<!-- ==== Planny Cloud Adapter + Year Selector (Supabase via /api/files) ==== -->
+<!-- ==== Planny Cloud Year Selector + Cloud Adapter (non-invasivo) ==== -->
 <style>
-  /* mini stile non invasivo per il selettore anno */
-  #cloud-year-box{display:flex;gap:6px;align-items:center}
+  #cloud-year-box{display:flex;gap:6px;align-items:center;margin:6px 8px}
   #cloud-year-box label{opacity:.8;font-size:12px}
   #cloud-year-box select{padding:4px 8px;border-radius:6px;border:1px solid #c8ced8}
   #cloud-year-badge{font:12px monospace;opacity:.7}
@@ -1559,18 +1558,10 @@ document.addEventListener('keydown', (e)=>{
   }
 
   window.Cloud = {
-    async readSelections(year){
-      const t = await apiGet(fname(year));
-      return t ?? '';
-    },
-    async saveSelections(year, text){
-      return await apiPut(fname(year), text || '');
-    },
+    async readSelections(year){ const t = await apiGet(fname(year)); return t ?? ''; },
+    async saveSelections(year, text){ return await apiPut(fname(year), text || ''); },
     async readConfig(){
-      for (const n of CFG){
-        const t = await apiGet(n);
-        if (t !== null) return { name:n, text:t };
-      }
+      for (const n of CFG){ const t = await apiGet(n); if (t!==null) return {name:n,text:t}; }
       return { name: CFG[0], text: '' };
     },
     async saveConfig(text, name){
@@ -1580,7 +1571,6 @@ document.addEventListener('keydown', (e)=>{
     }
   };
 
-  // Parser semplice: "anni=2025,2026,2027" in ini/txt
   function parseIniYears(txt){
     const m = (txt||'').match(/^\s*anni\s*=\s*([0-9,\s]+)\s*$/im);
     if(!m) return null;
@@ -1589,46 +1579,33 @@ document.addEventListener('keydown', (e)=>{
 
   function installYearSelector(years){
     if (document.getElementById('cloud-year-select')) return;
-
-    // Trova una toolbar dove inserirlo (prova vari container comuni)
-    let host = document.querySelector('#toolbar, .toolbar, header, .topbar');
+    let host = document.querySelector('#toolbar, .toolbar, header, .topbar, .controls');
     if (!host) host = document.body.firstElementChild || document.body;
 
     const box = document.createElement('div');
     box.id = 'cloud-year-box';
-    box.style.margin = '6px 8px';
-
     const label = document.createElement('label');
     label.textContent = 'Anno';
     label.htmlFor = 'cloud-year-select';
-
     const sel = document.createElement('select');
     sel.id = 'cloud-year-select';
-
     const badge = document.createElement('span');
     badge.id = 'cloud-year-badge';
+    badge.style.marginLeft = '6px';
 
-    box.appendChild(label);
-    box.appendChild(sel);
-    box.appendChild(badge);
+    box.appendChild(label); box.appendChild(sel); box.appendChild(badge);
+    host.insertBefore(box, host.firstChild);
 
-    // Inserisci in testa alla toolbar
-    if (host.firstChild) host.insertBefore(box, host.firstChild);
-    else host.appendChild(box);
-
-    // Popola anni
     const now = new Date().getFullYear();
     const list = (years && years.length ? years : [now-1, now, now+1, now+2]);
-    sel.innerHTML = list.map(y => `<option value="${y}">${y}</option>`).join('');
+    sel.innerHTML = list.map(y=>`<option value="${y}">${y}</option>`).join('');
 
-    // Imposta valore (saved -> state.year -> now)
     const saved = localStorage.getItem('plannyYear');
     const target = (saved && list.includes(+saved)) ? +saved :
                    (window.state && window.state.year && list.includes(+window.state.year) ? +window.state.year : now);
     sel.value = String(target);
     localStorage.setItem('plannyYear', sel.value);
-    window.state = window.state || {};
-    window.state.year = +sel.value;
+    window.state = window.state || {}; window.state.year = +sel.value;
     badge.textContent = fname(sel.value);
 
     sel.addEventListener('change', async () => {
@@ -1642,9 +1619,7 @@ document.addEventListener('keydown', (e)=>{
   window.saveSelectionsToCloud = async function(){
     const y = window.state?.year || new Date().getFullYear();
     let text = '';
-    try{
-      if (typeof window.selectionsToText === 'function') text = window.selectionsToText();
-    }catch{}
+    try{ if (typeof window.selectionsToText === 'function') text = window.selectionsToText(); }catch{}
     await window.Cloud.saveSelections(y, text);
     console.log('[Cloud] Salvato selections_'+y+'.txt');
   };
@@ -1652,50 +1627,37 @@ document.addEventListener('keydown', (e)=>{
   window.reloadSelectionsFromCloud = async function(){
     const y = window.state?.year || new Date().getFullYear();
     const txt = await window.Cloud.readSelections(y);
-    if (typeof window.importSelectionsFromText === 'function') {
-      window.importSelectionsFromText(txt || '');
-    }
+    if (typeof window.importSelectionsFromText === 'function') window.importSelectionsFromText(txt || '');
     if (typeof window.renderCalendar === 'function') window.renderCalendar();
     console.log('[Cloud] Ricaricato selections_'+y+'.txt');
   };
 
   async function boot(){
-    // Prepara state/year
     window.state = window.state || {};
     if (!window.state.year) {
       const saved = localStorage.getItem('plannyYear');
       window.state.year = saved ? +saved : (new Date().getFullYear());
     }
-
-    // Config -> anni (se presenti)
     let yearsFromCfg = null;
     try{
-      const { name, text } = await window.Cloud.readConfig();
+      const {name,text} = await window.Cloud.readConfig();
       window.Cloud._lastCfgName = name;
-      if (typeof window.applyConfigFromText === 'function') {
-        try { window.applyConfigFromText(text); } catch(_){}
-      }
+      if (typeof window.applyConfigFromText === 'function') { try{ window.applyConfigFromText(text); }catch{} }
       yearsFromCfg = parseIniYears(text);
     }catch{}
 
     installYearSelector(yearsFromCfg);
 
-    // Carica selections iniziali
     try{
       const txt = await window.Cloud.readSelections(window.state.year);
-      if (typeof window.importSelectionsFromText === 'function') {
-        window.importSelectionsFromText(txt || '');
-      }
+      if (typeof window.importSelectionsFromText === 'function') window.importSelectionsFromText(txt || '');
       if (typeof window.renderCalendar === 'function') window.renderCalendar();
-    }catch(e){
-      console.warn('Cloud bootstrap error:', e);
-    }
+    }catch(e){ console.warn('Cloud bootstrap error:', e); }
   }
-
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();
 </script>
-<!-- ==== /Planny Cloud Adapter ==== -->
+<!-- ==== /Year Selector + Cloud Adapter ==== -->
 </body>
 </html>
