@@ -1531,12 +1531,16 @@ document.addEventListener('keydown', (e)=>{
 </script>
 
 
-<!-- ==== Planny Cloud Year Selector + Cloud Adapter (non-invasivo) ==== -->
+<!-- ==== Planny Cloud: Status + Year + Cloud Adapter (non invasivo) ==== -->
 <style>
-  #cloud-year-box{display:flex;gap:6px;align-items:center;margin:6px 8px}
-  #cloud-year-box label{opacity:.8;font-size:12px}
-  #cloud-year-box select{padding:4px 8px;border-radius:6px;border:1px solid #c8ced8}
-  #cloud-year-badge{font:12px monospace;opacity:.7}
+  #cloud-status-indicator{position:fixed;top:10px;right:12px;width:14px;height:14px;border-radius:50%;
+    box-shadow:0 0 4px #0004;z-index:9999;background:#888;transition:background-color .3s}
+  #cloud-status-indicator[data-state="ok"]{background:#1ec91e}
+  #cloud-status-indicator[data-state="dirty"]{background:#e33}
+  #cloud-status-indicator[data-state="saving"]{background:#ffb300}
+  #cloud-year-box{position:fixed;top:10px;left:12px;background:#fff8;color:#111;padding:4px 6px;
+    border-radius:8px;z-index:9999;backdrop-filter:blur(3px);font-size:12px;display:flex;gap:6px;align-items:center}
+  #cloud-year-box select{padding:2px 6px;border-radius:6px;border:1px solid #c8ced8}
 </style>
 <script>
 (function(){
@@ -1545,6 +1549,12 @@ document.addEventListener('keydown', (e)=>{
   const bust = () => '?ts=' + Date.now();
   const fname = y => `selections_${String(y).trim()}.txt`;
 
+  const spy = document.createElement('div');
+  spy.id='cloud-status-indicator'; spy.dataset.state='ok'; spy.title='Tutto salvato';
+  document.addEventListener('DOMContentLoaded', ()=> document.body.appendChild(spy) );
+
+  function setSpy(state, text){ spy.dataset.state=state; spy.title=text||spy.title; }
+
   async function apiGet(n){
     const r = await fetch(API + encodeURIComponent(n) + bust(), { cache:'no-store' });
     if (r.status === 404) return null;
@@ -1552,22 +1562,31 @@ document.addEventListener('keydown', (e)=>{
     return await r.text();
   }
   async function apiPut(n, txt){
+    setSpy('saving','Salvataggio in corso…');
     const r = await fetch(API + encodeURIComponent(n), { method:'PUT', body: txt ?? '' });
-    if (!r.ok) throw new Error('PUT '+n+' → '+r.status);
+    if (!r.ok) { setSpy('dirty','Errore salvataggio'); throw new Error('PUT '+n+' → '+r.status); }
+    setSpy('ok','Tutto salvato');
     try { return await r.json(); } catch { return { ok:true }; }
   }
 
   window.Cloud = {
     async readSelections(year){ const t = await apiGet(fname(year)); return t ?? ''; },
-    async saveSelections(year, text){ return await apiPut(fname(year), text || ''); },
-    async readConfig(){
-      for (const n of CFG){ const t = await apiGet(n); if (t!==null) return {name:n,text:t}; }
-      return { name: CFG[0], text: '' };
-    },
-    async saveConfig(text, name){
-      const n = name || (window.Cloud && window.Cloud._lastCfgName) || CFG[0];
-      window.Cloud._lastCfgName = n;
-      return await apiPut(n, text || '');
+    async saveSelections(year, text){ window._savingInProgress=true; try{ return await apiPut(fname(year), text||''); } finally{ window._savingInProgress=false; } },
+    async readConfig(){ for(const n of CFG){ const t=await apiGet(n); if(t!==null) return {name:n,text:t}; } return {name:CFG[0],text:''}; },
+    async saveConfig(text, name){ const n=name||(window.Cloud&&window.Cloud._lastCfgName)||CFG[0]; window.Cloud._lastCfgName=n; return await apiPut(n, text||''); }
+  };
+
+  let dirtyTimer;
+  window.markDirty = function(){
+    if (spy.dataset.state==='saving') return;
+    setSpy('dirty','Modifiche non salvate');
+    clearTimeout(dirtyTimer);
+    dirtyTimer = setTimeout(()=>{},300);
+  };
+
+  window.onbeforeunload = function(e){
+    if (window._savingInProgress) {
+      e.preventDefault(); e.returnValue='Attendi che il salvataggio termini.'; return e.returnValue;
     }
   };
 
@@ -1576,193 +1595,52 @@ document.addEventListener('keydown', (e)=>{
     if(!m) return null;
     return m[1].split(',').map(s=>s.trim()).filter(Boolean).map(Number);
   }
-
   function installYearSelector(years){
     if (document.getElementById('cloud-year-select')) return;
-    let host = document.querySelector('#toolbar, .toolbar, header, .topbar, .controls');
-    if (!host) host = document.body.firstElementChild || document.body;
-
-    const box = document.createElement('div');
-    box.id = 'cloud-year-box';
-    const label = document.createElement('label');
-    label.textContent = 'Anno';
-    label.htmlFor = 'cloud-year-select';
-    const sel = document.createElement('select');
-    sel.id = 'cloud-year-select';
-    const badge = document.createElement('span');
-    badge.id = 'cloud-year-badge';
-    badge.style.marginLeft = '6px';
-
-    box.appendChild(label); box.appendChild(sel); box.appendChild(badge);
-    host.insertBefore(box, host.firstChild);
-
-    const now = new Date().getFullYear();
-    const list = (years && years.length ? years : [now-1, now, now+1, now+2]);
-    sel.innerHTML = list.map(y=>`<option value="${y}">${y}</option>`).join('');
-
-    const saved = localStorage.getItem('plannyYear');
-    const target = (saved && list.includes(+saved)) ? +saved :
-                   (window.state && window.state.year && list.includes(+window.state.year) ? +window.state.year : now);
-    sel.value = String(target);
-    localStorage.setItem('plannyYear', sel.value);
-    window.state = window.state || {}; window.state.year = +sel.value;
-    badge.textContent = fname(sel.value);
-
-    sel.addEventListener('change', async () => {
-      window.state.year = +sel.value;
-      localStorage.setItem('plannyYear', sel.value);
-      badge.textContent = fname(sel.value);
-      await reloadSelectionsFromCloud();
-    });
+    const box=document.createElement('div'); box.id='cloud-year-box';
+    box.innerHTML='<label>Anno</</label><select id="cloud-year-select"></select>';
+    document.addEventListener('DOMContentLoaded', ()=> document.body.appendChild(box) );
+    const now=new Date().getFullYear();
+    const list=(years&&years.length?years:[now-1,now,now+1,now+2]);
+    let sel;
+    function afterAttach(){
+      sel=document.getElementById('cloud-year-select');
+      sel.innerHTML=list.map(y=>`<option value="${y}">${y}</option>`).join('');
+      const saved=localStorage.getItem('plannyYear');
+      const target=(saved&&list.includes(+saved))?+saved:now;
+      sel.value=String(target);
+      window.state=window.state||{}; window.state.year=+sel.value;
+      sel.addEventListener('change', async ()=>{
+        window.state.year=+sel.value; localStorage.setItem('plannyYear', sel.value);
+        const txt=await Cloud.readSelections(window.state.year);
+        if(window.importSelectionsFromText)window.importSelectionsFromText(txt||'');
+        if(window.renderCalendar)window.renderCalendar();
+        setSpy('ok','Tutto salvato');
+      });
+    }
+    document.addEventListener('DOMContentLoaded', afterAttach);
   }
-
-  window.saveSelectionsToCloud = async function(){
-    const y = window.state?.year || new Date().getFullYear();
-    let text = '';
-    try{ if (typeof window.selectionsToText === 'function') text = window.selectionsToText(); }catch{}
-    await window.Cloud.saveSelections(y, text);
-    console.log('[Cloud] Salvato selections_'+y+'.txt');
-  };
-
-  window.reloadSelectionsFromCloud = async function(){
-    const y = window.state?.year || new Date().getFullYear();
-    const txt = await window.Cloud.readSelections(y);
-    if (typeof window.importSelectionsFromText === 'function') window.importSelectionsFromText(txt || '');
-    if (typeof window.renderCalendar === 'function') window.renderCalendar();
-    console.log('[Cloud] Ricaricato selections_'+y+'.txt');
-  };
 
   async function boot(){
-    window.state = window.state || {};
-    if (!window.state.year) {
-      const saved = localStorage.getItem('plannyYear');
-      window.state.year = saved ? +saved : (new Date().getFullYear());
-    }
-    let yearsFromCfg = null;
+    window.state=window.state||{};
+    const y=window.state.year||new Date().getFullYear();
+    let yearsFromCfg=null;
     try{
-      const {name,text} = await window.Cloud.readConfig();
-      window.Cloud._lastCfgName = name;
-      if (typeof window.applyConfigFromText === 'function') { try{ window.applyConfigFromText(text); }catch{} }
-      yearsFromCfg = parseIniYears(text);
+      const {text}=await Cloud.readConfig();
+      yearsFromCfg=parseIniYears(text);
     }catch{}
-
     installYearSelector(yearsFromCfg);
-
     try{
-      const txt = await window.Cloud.readSelections(window.state.year);
-      if (typeof window.importSelectionsFromText === 'function') window.importSelectionsFromText(txt || '');
-      if (typeof window.renderCalendar === 'function') window.renderCalendar();
-    }catch(e){ console.warn('Cloud bootstrap error:', e); }
+      const txt=await Cloud.readSelections(y);
+      if(window.importSelectionsFromText)window.importSelectionsFromText(txt||'');
+      if(window.renderCalendar)window.renderCalendar();
+      setSpy('ok','Tutto salvato');
+    }catch(e){ setSpy('dirty','Errore connessione'); console.warn(e); }
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();
 </script>
-<!-- ==== /Year Selector + Cloud Adapter ==== -->
-	<script>
-/* ===== Log su "Terminale" esistente (non invasivo) ===== */
-(function () {
-  // Trova l'elemento del terminale già presente in pagina
-  function getTerminalEl() {
-    // prova gli id/class più comuni nel tuo file
-    return (
-      document.querySelector('#terminal, #term, #console, #log') ||
-      document.querySelector('.terminal textarea, .terminal pre') ||
-      document.querySelector('.terminal') ||
-      null
-    );
-  }
-
-  function ts() {
-    const d = new Date();
-    return d.toLocaleTimeString();
-  }
-
-  function tlog(msg, type = 'info') {
-    const el = getTerminalEl();
-    const line = `[${ts()}] ${type.toUpperCase()}: ${msg}\n`;
-
-    if (!el) {
-      // se per qualche motivo non lo trova, almeno log su console
-      console.log('[TERMINALE]', line.trim());
-      return;
-    }
-
-    // textarea/input → value; pre/div → textContent
-    const tag = (el.tagName || '').toUpperCase();
-    if (tag === 'TEXTAREA' || tag === 'INPUT') {
-      el.value += line;
-      el.scrollTop = el.scrollHeight;
-    } else {
-      el.textContent += line;
-      el.scrollTop = el.scrollHeight;
-    }
-  }
-
-  // Se l'adapter Cloud non è presente, non facciamo nulla
-  if (!window.Cloud) return;
-
-  // Wrap non invasivo: aggiunge log a read/save senza cambiare la logica
-  const _read = Cloud.readSelections.bind(Cloud);
-  Cloud.readSelections = async function (year) {
-    tlog(`GET selections_${year}.txt …`);
-    try {
-      const txt = await _read(year);
-      tlog(`GET OK (${(txt || '').length} byte)`, 'ok');
-      return txt;
-    } catch (e) {
-      tlog(`GET ERR ${e && e.message ? e.message : e}`, 'err');
-      throw e;
-    }
-  };
-
-  const _save = Cloud.saveSelections.bind(Cloud);
-  Cloud.saveSelections = async function (year, text) {
-    const size = (text || '').length;
-    tlog(`PUT selections_${year}.txt (${size} byte) …`);
-    try {
-      const res = await _save(year, text);
-      const rsize = (res && res.size != null) ? res.size : size;
-      const mode  = (res && res.mode) || '?';
-      tlog(`PUT OK size=${rsize} mode=${mode}`, 'ok');
-      return res;
-    } catch (e) {
-      tlog(`PUT ERR ${e && e.message ? e.message : e}`, 'err');
-      throw e;
-    }
-  };
-
-  // (opzionale) log anche su config
-  if (Cloud.readConfig) {
-    const _rc = Cloud.readConfig.bind(Cloud);
-    Cloud.readConfig = async function () {
-      tlog('GET config (ini/txt) …');
-      try {
-        const out = await _rc();
-        tlog(`GET config OK (${out && out.name ? out.name : '?'})`, 'ok');
-        return out;
-      } catch (e) {
-        tlog(`GET config ERR ${e && e.message ? e.message : e}`, 'err');
-        throw e;
-      }
-    };
-  }
-  if (Cloud.saveConfig) {
-    const _sc = Cloud.saveConfig.bind(Cloud);
-    Cloud.saveConfig = async function (text, name) {
-      tlog(`PUT ${name || 'config'} (${(text || '').length} byte) …`);
-      try {
-        const out = await _sc(text, name);
-        tlog('PUT config OK', 'ok');
-        return out;
-      } catch (e) {
-        tlog(`PUT config ERR ${e && e.message ? e.message : e}`, 'err');
-        throw e;
-      }
-    };
-  }
-})();
-</script>
-
+<!-- ==== /Planny Cloud ==== -->
 </body>
 </html>
