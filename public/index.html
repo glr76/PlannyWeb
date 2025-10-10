@@ -6,205 +6,101 @@
   <title>Planny Web – Cloud</title>
   <style>
     :root { --bg:#0b0f14; --card:#121820; --soft:#1a2330; --text:#e8f0ff; --muted:#9fb3c8; --accent:#7cc4ff; }
-    * { box-sizing: border-box; }
-    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--text); }
-    header { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid #223; background:var(--card); position:sticky; top:0; z-index:2; }
-    header h1 { font-size:18px; margin:0; letter-spacing:.3px; }
-    header .right { display:flex; gap:10px; align-items:center; }
-    select, button, input[type="number"] { background:var(--soft); color:var(--text); border:1px solid #2b394a; border-radius:10px; padding:8px 12px; }
-    button { cursor:pointer; }
-    main { padding:18px; }
-    .grid { display:grid; grid-template-columns: 1fr; gap:16px; }
-    @media (min-width: 880px) {
-      .grid { grid-template-columns: 1fr 1fr; }
-    }
-    .card { background:var(--card); border:1px solid #223; border-radius:16px; padding:14px; }
-    .card h2 { margin: 6px 0 12px; font-size:16px; }
-    textarea { width:100%; min-height:360px; resize:vertical; background:var(--soft); color:var(--text); border:1px solid #2b394a; border-radius:12px; padding:12px; line-height:1.35; }
-    .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
-    .muted { color:var(--muted); font-size:12px; }
-    .ok { color:#7CFFB3; }
-    .warn { color:#ffd27c; }
-    .err { color:#ff7c94; }
-    .pill { background:#15202b; border:1px solid #243446; padding:4px 8px; border-radius:999px; font-size:12px; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Consolas, Menlo, monospace; }
+    * { box-sizing:border-box }
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #223;background:var(--card)}
+    header h1{font-size:18px;margin:0}
+    header .right{display:flex;gap:10px;align-items:center}
+    select,button{background:var(--soft);color:var(--text);border:1px solid #2b394a;border-radius:10px;padding:8px 12px}
+    button{cursor:pointer}
+    main{padding:18px}
+    .card{background:var(--card);border:1px solid #223;border-radius:16px;padding:14px;margin-bottom:20px}
+    textarea{width:100%;min-height:300px;resize:vertical;background:var(--soft);color:var(--text);border:1px solid #2b394a;border-radius:12px;padding:12px}
+    .muted{color:var(--muted);font-size:12px}
+    .ok{color:#7CFFB3}.warn{color:#ffd27c}.err{color:#ff7c94}
   </style>
 </head>
 <body>
-  <header>
-    <h1>Planny Web · Storage Cloud</h1>
-    <div class="right">
-      <label for="yearSel" class="muted">Anno</label>
-      <select id="yearSel"></select>
-      <span id="fileBadge" class="pill mono"></span>
-      <button id="reloadBtn">Ricarica</button>
-      <button id="saveBtn">Salva</button>
-    </div>
-  </header>
+<header>
+  <h1>Planny Cloud</h1>
+  <div class="right">
+    <label for="yearSel" class="muted">Anno</label>
+    <select id="yearSel"></select>
+    <span id="fileName" style="font-family:monospace;padding:4px 8px;background:#15202b;border:1px solid #243446;border-radius:999px"></span>
+    <button id="reloadBtn">Ricarica</button>
+    <button id="saveBtn">Salva</button>
+    <span id="status" class="muted"></span>
+  </div>
+</header>
 
-  <main>
-    <div class="grid">
-      <section class="card">
-        <h2>Selections (<span id="fileNameSel" class="mono"></span>)</h2>
-        <textarea id="selectionsBox" spellcheck="false" placeholder="Inserisci/edita il contenuto di selections_YYYY.txt..."></textarea>
-        <div class="row">
-          <span id="selStatus" class="muted">Pronto</span>
-        </div>
-      </section>
+<main>
+  <div class="card">
+    <h2>Selections</h2>
+    <textarea id="txtBox" spellcheck="false" placeholder="Contenuto di selections_YYYY.txt..."></textarea>
+  </div>
+  <div class="card">
+    <h2>Config (config.txt)</h2>
+    <textarea id="cfgBox" spellcheck="false"></textarea><br>
+    <button id="reloadCfg">Ricarica config</button>
+    <button id="saveCfg">Salva config</button>
+    <span id="cfgStatus" class="muted"></span>
+  </div>
+</main>
 
-      <section class="card">
-        <h2>Config (config.txt)</h2>
-        <textarea id="configBox" spellcheck="false" placeholder="Contenuto di config.txt..."></textarea>
-        <div class="row">
-          <button id="reloadCfgBtn">Ricarica config</button>
-          <button id="saveCfgBtn">Salva config</button>
-          <span id="cfgStatus" class="muted">Pronto</span>
-        </div>
-      </section>
-    </div>
-  </main>
+<script>
+const API='/api/files/';
+const $=s=>document.querySelector(s);
+const yearSel=$('#yearSel'),fileName=$('#fileName'),txtBox=$('#txtBox'),statusEl=$('#status');
+const cfgBox=$('#cfgBox'),cfgStatus=$('#cfgStatus');
 
-  <script>
-    const API = '/api/files/';
-    const $ = (sel) => document.querySelector(sel);
+const fname=y=>`selections_${y}.txt`;
+const bust=()=>'?ts='+Date.now();
+const setStatus=(el,txt,cls='muted')=>{el.className=cls;el.textContent=txt};
 
-    // Utilità
-    const fnameForYear = (y) => `selections_${String(y).trim()}.txt`;
-    const bust = () => 'ts=' + Date.now();
+async function apiGet(n){const r=await fetch(API+encodeURIComponent(n)+bust(),{cache:'no-store'});if(!r.ok)throw new Error(r.status);return await r.text()}
+async function apiPut(n,t){const r=await fetch(API+encodeURIComponent(n),{method:'PUT',body:t??''});return await r.json()}
 
-    async function apiGet(name) {
-      name = name.trim();
-      const r = await fetch(API + encodeURIComponent(name) + '?' + bust(), { cache: 'no-store' });
-      if (!r.ok) throw new Error('GET ' + name + ' → ' + r.status);
-      return await r.text();
-    }
-    async function apiPut(name, text) {
-      name = name.trim();
-      const r = await fetch(API + encodeURIComponent(name), {
-        method:'PUT',
-        body: text ?? '',
-        cache: 'no-store'
-      });
-      let body = null;
-      try { body = await r.json(); } catch(e){}
-      if (!r.ok || !body || body.ok !== true) {
-        throw new Error('PUT ' + name + ' → ' + r.status + ' ' + (body && body.error ? body.error : ''));
-      }
-      return body;
-    }
+function populateYears(){
+  const now=new Date().getFullYear();
+  const ys=[now-1,now,now+1,now+2];
+  yearSel.innerHTML=ys.map(y=>`<option>${y}</option>`).join('');
+  const saved=localStorage.getItem('plannyYear');
+  yearSel.value=saved&&ys.includes(+saved)?saved:now;
+  updateFile();
+}
+function updateFile(){
+  const y=yearSel.value;
+  localStorage.setItem('plannyYear',y);
+  fileName.textContent=fname(y);
+  return fname(y);
+}
+async function loadSel(){
+  const f=updateFile();
+  try{setStatus(statusEl,'Carico...');txtBox.value=await apiGet(f);setStatus(statusEl,'Caricato','ok')}
+  catch{txtBox.value='';setStatus(statusEl,'Nuovo file','warn')}
+}
+async function saveSel(){
+  const f=updateFile(),t=txtBox.value;
+  try{setStatus(statusEl,'Salvo...');const r=await apiPut(f,t);setStatus(statusEl,'Salvato '+(r.size||'')+'B','ok')}
+  catch(e){setStatus(statusEl,e.message,'err')}
+}
+async function loadCfg(){
+  try{setStatus(cfgStatus,'Carico...');cfgBox.value=await apiGet('config.txt');setStatus(cfgStatus,'Caricato','ok')}
+  catch{cfgBox.value='';setStatus(cfgStatus,'Nuovo','warn')}
+}
+async function saveCfg(){
+  try{setStatus(cfgStatus,'Salvo...');const r=await apiPut('config.txt',cfgBox.value);setStatus(cfgStatus,'Salvato','ok')}
+  catch(e){setStatus(cfgStatus,e.message,'err')}
+}
 
-    function setStatus(el, text, cls='muted') {
-      el.className = cls;
-      el.textContent = text;
-    }
+yearSel.onchange=loadSel;
+$('#reloadBtn').onclick=loadSel;
+$('#saveBtn').onclick=saveSel;
+$('#reloadCfg').onclick=loadCfg;
+$('#saveCfg').onclick=saveCfg;
+window.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();saveSel()}});
 
-    // UI wires
-    const yearSel = $('#yearSel');
-    const fileBadge = $('#fileBadge');
-    const fileNameSel = $('#fileNameSel');
-    const selectionsBox = $('#selectionsBox');
-    const selStatus = $('#selStatus');
-    const saveBtn = $('#saveBtn');
-    const reloadBtn = $('#reloadBtn');
-
-    const configBox = $('#configBox');
-    const cfgStatus = $('#cfgStatus');
-    const saveCfgBtn = $('#saveCfgBtn');
-    const reloadCfgBtn = $('#reloadCfgBtn');
-
-    function populateYears() {
-      const now = new Date();
-      const yrs = [now.getFullYear()-1, now.getFullYear(), now.getFullYear()+1, now.getFullYear()+2];
-      yearSel.innerHTML = yrs.map(y => `<option value="${y}">${y}</option>`).join('');
-
-      // Persistenza anno selezionato
-      const saved = localStorage.getItem('plannyYear');
-      yearSel.value = saved && yrs.includes(Number(saved)) ? saved : now.getFullYear();
-    }
-
-    function updateFileLabels() {
-      const y = yearSel.value;
-      const fn = fnameForYear(y);
-      fileBadge.textContent = fn;
-      fileNameSel.textContent = fn;
-      localStorage.setItem('plannyYear', y);
-    }
-
-    async function loadSelections() {
-      const fn = fileBadge.textContent;
-      try {
-        setStatus(selStatus, 'Caricamento…', 'muted');
-        selectionsBox.value = await apiGet(fn);
-        setStatus(selStatus, 'Caricato ✔', 'ok');
-      } catch (e) {
-        selectionsBox.value = '';
-        setStatus(selStatus, 'Non trovato (nuovo file)', 'warn');
-      }
-    }
-
-    async function saveSelections() {
-      const fn = fileBadge.textContent;
-      const txt = selectionsBox.value;
-      try {
-        setStatus(selStatus, 'Salvataggio…', 'muted');
-        const res = await apiPut(fn, txt);
-        setStatus(selStatus, `Salvato (${res.size} byte) ✔`, 'ok');
-        // rilettura per conferma
-        const check = await apiGet(fn);
-        if (check !== txt) setStatus(selStatus, 'Attenzione: rilettura diversa dal salvato', 'warn');
-      } catch (e) {
-        console.error(e);
-        setStatus(selStatus, e.message, 'err');
-      }
-    }
-
-    async function loadConfig() {
-      try {
-        setStatus(cfgStatus, 'Caricamento…', 'muted');
-        configBox.value = await apiGet('config.txt');
-        setStatus(cfgStatus, 'Caricato ✔', 'ok');
-      } catch (e) {
-        configBox.value = '';
-        setStatus(cfgStatus, 'Non trovato (nuovo file)', 'warn');
-      }
-    }
-
-    async function saveConfig() {
-      try {
-        setStatus(cfgStatus, 'Salvataggio…', 'muted');
-        const res = await apiPut('config.txt', configBox.value);
-        setStatus(cfgStatus, `Salvato (${res.size} byte) ✔`, 'ok');
-      } catch (e) {
-        console.error(e);
-        setStatus(cfgStatus, e.message, 'err');
-      }
-    }
-
-    // Event handlers
-    yearSel.addEventListener('change', async () => {
-      updateFileLabels();
-      await loadSelections();
-    });
-    reloadBtn.addEventListener('click', loadSelections);
-    saveBtn.addEventListener('click', saveSelections);
-    reloadCfgBtn.addEventListener('click', loadConfig);
-    saveCfgBtn.addEventListener('click', saveConfig);
-
-    // Shortcut: Ctrl+S salva selections
-    window.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-        e.preventDefault();
-        saveSelections();
-      }
-    });
-
-    // Init
-    (async function init(){
-      populateYears();
-      updateFileLabels();
-      await loadSelections();
-      await loadConfig();
-    })();
-  </script>
+(async()=>{populateYears();await loadSel();await loadCfg();})();
+</script>
 </body>
 </html>
