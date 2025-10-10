@@ -74,13 +74,17 @@
 
     async function apiGet(name) {
       name = name.trim();
-      const r = await fetch(API + encodeURIComponent(name) + '?' + bust());
+      const r = await fetch(API + encodeURIComponent(name) + '?' + bust(), { cache: 'no-store' });
       if (!r.ok) throw new Error('GET ' + name + ' → ' + r.status);
       return await r.text();
     }
     async function apiPut(name, text) {
       name = name.trim();
-      const r = await fetch(API + encodeURIComponent(name), { method:'PUT', body: text ?? '' });
+      const r = await fetch(API + encodeURIComponent(name), {
+        method:'PUT',
+        body: text ?? '',
+        cache: 'no-store'
+      });
       let body = null;
       try { body = await r.json(); } catch(e){}
       if (!r.ok || !body || body.ok !== true) {
@@ -112,7 +116,10 @@
       const now = new Date();
       const yrs = [now.getFullYear()-1, now.getFullYear(), now.getFullYear()+1, now.getFullYear()+2];
       yearSel.innerHTML = yrs.map(y => `<option value="${y}">${y}</option>`).join('');
-      yearSel.value = now.getFullYear();
+
+      // Persistenza anno selezionato
+      const saved = localStorage.getItem('plannyYear');
+      yearSel.value = saved && yrs.includes(Number(saved)) ? saved : now.getFullYear();
     }
 
     function updateFileLabels() {
@@ -120,6 +127,7 @@
       const fn = fnameForYear(y);
       fileBadge.textContent = fn;
       fileNameSel.textContent = fn;
+      localStorage.setItem('plannyYear', y);
     }
 
     async function loadSelections() {
@@ -181,6 +189,14 @@
     saveBtn.addEventListener('click', saveSelections);
     reloadCfgBtn.addEventListener('click', loadConfig);
     saveCfgBtn.addEventListener('click', saveConfig);
+
+    // Shortcut: Ctrl+S salva selections
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        saveSelections();
+      }
+    });
 
     // Init
     (async function init(){
