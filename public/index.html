@@ -1659,5 +1659,110 @@ document.addEventListener('keydown', (e)=>{
 })();
 </script>
 <!-- ==== /Year Selector + Cloud Adapter ==== -->
+	<script>
+/* ===== Log su "Terminale" esistente (non invasivo) ===== */
+(function () {
+  // Trova l'elemento del terminale già presente in pagina
+  function getTerminalEl() {
+    // prova gli id/class più comuni nel tuo file
+    return (
+      document.querySelector('#terminal, #term, #console, #log') ||
+      document.querySelector('.terminal textarea, .terminal pre') ||
+      document.querySelector('.terminal') ||
+      null
+    );
+  }
+
+  function ts() {
+    const d = new Date();
+    return d.toLocaleTimeString();
+  }
+
+  function tlog(msg, type = 'info') {
+    const el = getTerminalEl();
+    const line = `[${ts()}] ${type.toUpperCase()}: ${msg}\n`;
+
+    if (!el) {
+      // se per qualche motivo non lo trova, almeno log su console
+      console.log('[TERMINALE]', line.trim());
+      return;
+    }
+
+    // textarea/input → value; pre/div → textContent
+    const tag = (el.tagName || '').toUpperCase();
+    if (tag === 'TEXTAREA' || tag === 'INPUT') {
+      el.value += line;
+      el.scrollTop = el.scrollHeight;
+    } else {
+      el.textContent += line;
+      el.scrollTop = el.scrollHeight;
+    }
+  }
+
+  // Se l'adapter Cloud non è presente, non facciamo nulla
+  if (!window.Cloud) return;
+
+  // Wrap non invasivo: aggiunge log a read/save senza cambiare la logica
+  const _read = Cloud.readSelections.bind(Cloud);
+  Cloud.readSelections = async function (year) {
+    tlog(`GET selections_${year}.txt …`);
+    try {
+      const txt = await _read(year);
+      tlog(`GET OK (${(txt || '').length} byte)`, 'ok');
+      return txt;
+    } catch (e) {
+      tlog(`GET ERR ${e && e.message ? e.message : e}`, 'err');
+      throw e;
+    }
+  };
+
+  const _save = Cloud.saveSelections.bind(Cloud);
+  Cloud.saveSelections = async function (year, text) {
+    const size = (text || '').length;
+    tlog(`PUT selections_${year}.txt (${size} byte) …`);
+    try {
+      const res = await _save(year, text);
+      const rsize = (res && res.size != null) ? res.size : size;
+      const mode  = (res && res.mode) || '?';
+      tlog(`PUT OK size=${rsize} mode=${mode}`, 'ok');
+      return res;
+    } catch (e) {
+      tlog(`PUT ERR ${e && e.message ? e.message : e}`, 'err');
+      throw e;
+    }
+  };
+
+  // (opzionale) log anche su config
+  if (Cloud.readConfig) {
+    const _rc = Cloud.readConfig.bind(Cloud);
+    Cloud.readConfig = async function () {
+      tlog('GET config (ini/txt) …');
+      try {
+        const out = await _rc();
+        tlog(`GET config OK (${out && out.name ? out.name : '?'})`, 'ok');
+        return out;
+      } catch (e) {
+        tlog(`GET config ERR ${e && e.message ? e.message : e}`, 'err');
+        throw e;
+      }
+    };
+  }
+  if (Cloud.saveConfig) {
+    const _sc = Cloud.saveConfig.bind(Cloud);
+    Cloud.saveConfig = async function (text, name) {
+      tlog(`PUT ${name || 'config'} (${(text || '').length} byte) …`);
+      try {
+        const out = await _sc(text, name);
+        tlog('PUT config OK', 'ok');
+        return out;
+      } catch (e) {
+        tlog(`PUT config ERR ${e && e.message ? e.message : e}`, 'err');
+        throw e;
+      }
+    };
+  }
+})();
+</script>
+
 </body>
 </html>
