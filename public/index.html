@@ -1,179 +1,54 @@
-<!doctype html>
-<html lang="it">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Planny (HTML)</title>
-  <style>
-    :root{
-      --bg:#f5f7fb; --panel:#ffffff; --surface:#eef2f7; --border:#dfe5ef;
-      --text:#0f1720; --muted:#5b6877;
-      --ok:#16a34a; --warn:#d97706; --err:#dc2626;
-    }
-    html,body{height:100%}
-    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu}
-    .wrap{max-width:1280px;margin:0 auto;padding:12px}
-    h1{margin:0 0 10px;font-size:18px;display:flex;align-items:center;gap:10px}
-    .badge{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:999px;background:#fff;border:1px solid var(--border);font-size:12px}
-    .dot{width:8px;height:8px;border-radius:50%}
-    .dot.ok{background:var(--ok)} .dot.warn{background:var(--warn)} .dot.err{background:var(--err)}
-    .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:10px}
-    #terminal{background:#0b0b0b;border:1px solid #1f2937;border-radius:12px;color:#c7d1db;height:200px;overflow:auto;padding:8px;font:12px ui-monospace,Consolas,monospace}
-    .ln{white-space:pre-wrap;margin:2px 0}
-    .ln.info{color:#9bb0c9} .ln.ok{color:#16a34a} .ln.warn{color:#f59e0b} .ln.err{color:#ef4444}
-    /* barra year_single_selector.js sarà iniettata sticky subito dopo <h1> */
-    #yearBarSingle{position:sticky;top:0;z-index:50}
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <h1>
-      Planny (HTML)
-      <span id="saveBadge" class="badge" title="Stato salvataggio">
-        <span id="saveDot" class="dot ok"></span>
-        <span id="saveText">salvato</span>
-      </span>
-    </h1>
+<!-- ⬇️ QUESTO BLOCCO È AGGIUNTO PRIMA DEL CARICAMENTO DI year_single_selector.js -->
+<script>
+// --- SHIM per year_single_selector.js: /api/years e /api/selections/YYYY ---
+(function () {
+  const origFetch = window.fetch.bind(window);
 
-    <!-- QUI SOTTO resta/va il TUO calendario originale -->
-    <div id="app" class="card" style="margin-bottom:10px">
-      <!-- Mantieni il tuo markup del planner.
-           Se il tuo calendario viene costruito da JS, lascia pure vuoto: verrà disegnato dopo. -->
-      <div id="calendar-mount"></div>
-    </div>
-
-    <div class="card">
-      <h3 style="margin:0 0 6px;color:#5b6877;font-size:13px">Terminale</h3>
-      <div id="terminal" aria-live="polite"></div>
-    </div>
-  </div>
-
-  <script>
-    /************ LOG MINIMO ************/
-    const T = document.getElementById('terminal');
-    function logLn(msg, lvl='info'){
-      (lvl==='err'?console.error:lvl==='warn'?console.warn:console.log)(msg);
-      if(!T) return;
-      const d=document.createElement('div'); d.className='ln '+lvl; 
-      const ts=new Date().toLocaleTimeString();
-      d.textContent = `[${ts}] ${lvl.toUpperCase()}: ${msg}`;
-      T.appendChild(d); T.scrollTop=T.scrollHeight;
-    }
-
-    /************ SPIA SALVATAGGIO & GUARDIA UNLOAD ************/
-    const badge = document.getElementById('saveBadge');
-    const dot   = document.getElementById('saveDot');
-    const sTxt  = document.getElementById('saveText');
-    const SaveUI = {
-      set(state){ // 'ok' | 'busy' | 'err'
-        if(state==='ok'){ dot.className='dot ok'; sTxt.textContent='salvato'; }
-        else if(state==='busy'){ dot.className='dot warn'; sTxt.textContent='salvataggio…'; }
-        else { dot.className='dot err'; sTxt.textContent='errore'; }
-      }
-    };
-    // Exposed hooks per il tuo codice:
-    window.__onSaveBegin  = () => SaveUI.set('busy');
-    window.__onSaveOk     = () => SaveUI.set('ok');
-    window.__onSaveError  = () => SaveUI.set('err');
-
-    let __saving = false, __pending = false;
-    function markSaving(b){ __saving = !!b; }
-    function markPending(b){ __pending = !!b; }
-    window.addEventListener('beforeunload', (e)=>{
-      if(__saving || __pending){
-        e.preventDefault();
-        e.returnValue = '';
+  function jsonResponse(obj, status = 200) {
+    return new Response(JSON.stringify(obj), {
+      status,
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-store, max-age=0'
       }
     });
+  }
 
-    /************ API CLOUD BASE ************/
-    async function getTextFromServer(name){
-      const r = await fetch('/api/files/' + encodeURIComponent(name), {cache:'no-store'});
-      if(r.status===404) return null;
-      if(!r.ok) throw new Error('HTTP '+r.status);
-      return r.text();
-    }
-    async function putTextToServer(name, content){
-      const r = await fetch('/api/files/' + encodeURIComponent(name), {
-        method:'PUT',
-        headers:{'Content-Type':'text/plain; charset=utf-8'},
-        body:content
-      });
-      if(!r.ok) throw new Error('HTTP '+r.status);
-      return r.json().catch(()=>({ok:true}));
-    }
+  // NON leggiamo la lista dal server: usiamo anno corrente e anno successivo
+  function listYearsFixed() {
+    const now = new Date().getFullYear();
+    return [now, now + 1];
+  }
 
-    /************ IMPORTER SELECTIONS ************
-     * Mantieni questa funzione se nel tuo index era già presente;
-     * è quella che year_single_selector.js chiamerà per passarti il testo.
-     */
-    window.importSelectionsFromText = function(txt){
-      // >>> QUI resta la tua logica originale di parsing + render <<<
-      // Se già l’avevi nel vecchio file, spostala/lascia qui senza cambiare il nome.
-      // Esempio minimo di log (da rimuovere se hai già il tuo parsing):
-      const n = (txt||'').split(/\r?\n/).filter(Boolean).length;
-      logLn('Selections caricati ('+n+' righe)','ok');
+  async function getSelectionsYear(year) {
+    // 1) text/plain
+    const r1 = await origFetch('/api/files/' + encodeURIComponent(`selections_${year}.txt`) + '?' + Date.now(), { cache:'no-store' });
+    if (r1.ok) return { ok:true, year, text: await r1.text() };
 
-      // Se il tuo calendario usa una variabile globale ‘state.year’, assicurati sia settata
-      // dal selettore anno (vedi sotto). Poi qui richiama il tuo render:
-      if(typeof renderCalendar==='function'){ try{ renderCalendar(); }catch(e){ logLn('Errore renderCalendar: '+e,'err'); } }
-      // In alternativa, il year_single_selector scatenerà anyway eventi custom che puoi intercettare.
-    };
+    // 2) JSON fallback
+    const r2 = await origFetch('/api/files/text/' + encodeURIComponent(`selections_${year}.txt`) + '?' + Date.now(), { cache:'no-store' });
+    if (!r2.ok) return { ok:false, year, text:'' };
+    const j = await r2.json().catch(()=>({ ok:false }));
+    if (j && j.ok) return { ok:true, year, text:j.text || '' };
+    return { ok:false, year, text:'' };
+  }
 
-    // Alias per year_single_selector.js: indica quale importer chiamare
-    window.__SINGLE_IMPORTER = "importSelectionsFromText";
-
-    /************ SALVATAGGIO SELECTIONS ************
-     * Mantieni queste due funzioni se il tuo codice salva così.
-     * Se nel tuo file originario avevi già versioni più ricche, tieni le tue e chiama i 3 hook UI.
-     */
-    function selectionsFileName(year){ return `selections_${year}.txt`; }
-
-    async function saveSelectionsText(year, text){
-      try{
-        window.__onSaveBegin(); markSaving(true);
-        await putTextToServer(selectionsFileName(year), text);
-        window.__onSaveOk(); markSaving(false);
-        logLn('Selections salvati su server: '+selectionsFileName(year),'ok');
-      }catch(e){
-        window.__onSaveError(); markSaving(false);
-        logLn('Errore salvataggio selections: '+(e.message||e),'err');
-        throw e;
+  // Intercetta solo gli endpoint che usa il selettore
+  window.fetch = async function (input, init) {
+    const url = (typeof input === 'string') ? input : (input?.url || '');
+    try {
+      if (/\/api\/years(?:\?|$)/.test(url)) {
+        return jsonResponse({ ok:true, years: listYearsFixed() });
       }
-    }
-
-    // Metti a disposizione un helper globale (se utile al tuo codice UI)
-    window.__saveSelectionsText = saveSelectionsText;
-
-    // Se vuoi proteggerti da chiusure durante salvataggi programmati:
-    window.__markPendingSave = (flag)=> markPending(!!flag);
-
-    /************ OPZIONALE: APPEND LOG CLOUD ************/
-    async function appendLog(year, lines){
-      try{
-        const name = `planny_log_${year}.txt`;
-        const prev = await getTextFromServer(name).catch(()=>null);
-        const merged = (prev||'') + (lines.endsWith('\n')?lines:(lines+'\n'));
-        await putTextToServer(name, merged);
-        logLn('Log aggiornato: '+name, 'ok');
-      }catch(e){
-        logLn('Log non aggiornato: '+(e.message||e),'warn');
+      const m = /\/api\/selections\/(\d{4})(?:\?|$)/.exec(url);
+      if (m) {
+        const yr = +m[1];
+        const payload = await getSelectionsYear(yr);
+        return jsonResponse(payload, payload.ok ? 200 : 404);
       }
-    }
-    window.__appendLog = appendLog;
-
-    /************ EVENTI COMODI ************/
-    window.addEventListener('planner:year-changed', (e)=>{
-      // Se vuoi agganciarti al cambio anno del selettore:
-      // e.detail.year contiene l'anno selezionato.
-      // Qui potresti aggiornare intestazioni UI ecc.
-    });
-
-    // Messaggio di boot
-    logLn('Autoload…','info');
-  </script>
-
-  <!-- Il selettore anno single-file (la tua versione) -->
-  <script src="year_single_selector.js"></script>
-</body>
-</html>
+    } catch {}
+    return origFetch(input, init);
+  };
+})();
+</script>
+<!-- ⬆️ FINE BLOCCO AGGIUNTO -->
