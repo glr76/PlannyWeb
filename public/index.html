@@ -1659,5 +1659,85 @@ document.addEventListener('keydown', (e)=>{
 })();
 </script>
 <!-- ==== /Year Selector + Cloud Adapter ==== -->
+
+<!-- === INDICATORE DI SALVATAGGIO + BLOOCCO REFRESH (patch minima, UI invariata) === -->
+<style>
+  #save-indicator{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#5b6877;user-select:none}
+  #save-indicator .dot{width:10px;height:10px;border-radius:50%;display:inline-block;background:#aaa}
+  #save-indicator .dot.ok{background:#16a34a}
+  #save-indicator .dot.dirty{background:#e11d48}
+  #save-indicator .dot.wait{background:#f59e0b;animation:pulse 1.2s infinite ease-in-out}
+  @keyframes pulse{0%,100%{opacity:.6}50%{opacity:1}}
+</style>
+<script>
+(function(){
+  let __dirty=false, __saving=false, __saveTimer=null;
+
+  function ensureIndicator(){
+    const h1=document.querySelector('h1');
+    if(!h1 || document.getElementById('save-indicator')) return;
+    const span=document.createElement('span');
+    span.id='save-indicator';
+    span.title='Stato salvataggio';
+    span.innerHTML='<span class="dot"></span><span class="label">pronto</span>';
+    h1.appendChild(span);
+  }
+  function updateSaveIndicator(){
+    const el=document.getElementById('save-indicator'); if(!el) return;
+    const dot=el.querySelector('.dot'), lab=el.querySelector('.label');
+    if(__saving){ dot.className='dot wait'; lab.textContent='salvataggio…'; return; }
+    if(__dirty){ dot.className='dot dirty'; lab.textContent='non salvato'; }
+    else{ dot.className='dot ok'; lab.textContent='salvato'; }
+  }
+  function setDirty(v){ __dirty=!!v; updateSaveIndicator(); }
+  function setSaving(v){ __saving=!!v; updateSaveIndicator(); }
+
+  window.addEventListener('beforeunload',(e)=>{
+    if(__dirty || __saving){ e.preventDefault(); e.returnValue=''; return ''; }
+  });
+
+  if(typeof window.writeCell==='function'){
+    const __origWriteCell = window.writeCell;
+    window.writeCell = function(...args){
+      const ret = __origWriteCell.apply(this,args);
+      try{ setDirty(true); window.scheduleAutoSave(); }catch(_){}
+      return ret;
+    };
+  }
+
+  const __origSchedule = window.scheduleAutoSave;
+  window.scheduleAutoSave = function(...args){
+    setDirty(true);
+    if(typeof __origSchedule==='function'){ return __origSchedule.apply(this,args); }
+    clearTimeout(__saveTimer);
+    __saveTimer=setTimeout(()=>{ try{ window.saveNow(); }catch(_){ } }, 800);
+  };
+
+  const __origSaveNow = window.saveNow;
+  window.saveNow = async function(...args){
+    setSaving(true);
+    try{
+      if(typeof __origSaveNow==='function'){
+        const r = await __origSaveNow.apply(this,args);
+        setDirty(false);
+        return r;
+      }else{
+        if(typeof window.saveSelectionsToServer==='function') await window.saveSelectionsToServer();
+        if(typeof window.appendLogsToServer==='function') await window.appendLogsToServer();
+        if(typeof window.exportXLSXServerSave==='function') await window.exportXLSXServerSave();
+        setDirty(false);
+      }
+    }catch(e){
+      console.warn('Errore saveNow:', e);
+    }finally{
+      setSaving(false);
+    }
+  };
+
+  document.addEventListener('DOMContentLoaded', ()=>{ ensureIndicator(); updateSaveIndicator(); });
+  window.__saveIndicator={ setDirty, setSaving, updateSaveIndicator };
+})();
+</script>
+<!-- === /INDICATORE DI SALVATAGGIO + BLOOCCO REFRESH === -->
 </body>
 </html>
