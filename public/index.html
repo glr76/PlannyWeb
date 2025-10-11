@@ -1,54 +1,1663 @@
-<!-- ⬇️ QUESTO BLOCCO È AGGIUNTO PRIMA DEL CARICAMENTO DI year_single_selector.js -->
-<script>
-// --- SHIM per year_single_selector.js: /api/years e /api/selections/YYYY ---
-(function () {
-  const origFetch = window.fetch.bind(window);
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Planny HTML</title>
+<style id="addon-terminal-minheight-v3">
+  .card:first-of-type { display: none !important; }
+  #terminal, .terminal, #console, .console, #log, .log {
+    height: 140px !important;
+    max-height: 140px !important;
+    overflow-y: auto !important;
+  }
+  .ln.ln-cell{ background: transparent; padding: 0; margin: 2px 0; }
+  .terminal .ln{ background: transparent !important; }
+  .terminal .ln.ln-cell{ background: transparent !important; padding: 0; margin: 2px 0; }
+#calendar {table-layout: fixed; width:100%; border-collapse: collapse;}
+th.datecol, td.datecol {width:100px; min-width:100px; max-width:100px;}
+td, th {padding: 2px 4px;}
+#calendar-container {margin-left:0;margin-right:0;padding-left:4px;padding-right:4px;max-width:100%;}
+#calendar {margin-left:0;margin-right:0;}
+.wrap{max-width:100% !important;margin:0 !important;padding-left:6px !important;padding-right:6px !important;}
+.card{padding-left:8px !important;padding-right:8px !important;}
+.month{margin-top:8px;}
+</style>
+<style>
+  :root{
+    --bg:#f5f7fb; --panel:#ffffff; --surface:#eef2f7; --border:#dfe5ef;
+    --text:#0f1720; --muted:#5b6877;
+    --accent:#2563eb; --accent2:#16a34a; --warn:#d97706; --holiday:#166534;
+    --chip:#f3f8ff; --chipBorder:#cfd9ea; --todayRow:rgba(34,197,94,.18);
+    --nameHeaderBg:#e9f3ff; --nameColBg:#f8fbff;
+  }
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu}
+  h1{font-size:20px;margin:0 0 10px}
+  .wrap{max-width:1280px;margin:0 auto;padding:16px}
 
-  function jsonResponse(obj, status = 200) {
-    return new Response(JSON.stringify(obj), {
-      status,
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Cache-Control': 'no-store, max-age=0'
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px}
+  .bar{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px;align-items:end}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+  input[type="text"],input[type="number"]{width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px}
+  input[disabled]{opacity:.7}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#0e1724;border:1px solid var(--border);font-size:12px;color:#b9c6d8}
+  .hint{font-size:12px;color:var(--muted)}
+
+  .tabsbar{display:flex;align-items:center;gap:12px;justify-content:space-between;margin-top:6px}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap}
+  .tab{padding:8px 10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);cursor:pointer;font-weight:600;color:#5b6877}
+  .tab.active{background:var(--accent);color:#07121f;border-color:transparent}
+  .bar-right{display:flex;gap:8px;align-items:center}
+  .btn{appearance:none;border:1px solid var(--border);background:var(--surface);color:var(--text);padding:10px 12px;border-radius:10px;cursor:pointer}
+  .btn.mini{padding:6px 10px;font-size:12px}
+  .searchbox{display:flex;gap:6px;align-items:center}
+  .searchbox input{width:220px;padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:var(--surface)}
+  .search-count{font-size:12px;color:var(--muted);min-width:60px;text-align:center}
+
+  .month{margin-top:10px;max-height:68vh;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;position:relative;scroll-snap-type:y mandatory;scroll-padding-top:48px}
+  table{width:100%;border-collapse:separate;border-spacing:0;position:relative;margin:0}
+  #calendar tbody tr{scroll-snap-align:start}
+  th,td{border:1px solid var(--border);padding:0}
+  thead th{position:sticky;top:0;background:#eef3fa;z-index:5}
+  th.name{min-width:110px;background:var(--nameHeaderBg)}
+  th.small{width:70px}
+  th.datecol{width:100px}
+ td.datecol { width:100px; }
+
+  td input{width:100%;box-sizing:border-box;border:0;background:transparent;color:var(--text);padding:8px;text-align:center;font:16px/1.2 "Segoe UI",system-ui}
+  td input:focus{outline:2px solid var(--accent)}
+  .rowhdr{background:var(--nameHeaderBg);color:#0f1720;text-align:right;padding:6px 8px;font-weight:700}
+  .count{font-weight:700;text-align:center}
+
+  .c-white{background:white}
+  .c-yellow{background:yellow}
+  .c-orange{background:orange}
+  .c-red{background:red}
+
+  .holiday{background:var(--holiday);color:#fff;font-weight:700}
+
+  .cell{position:relative;height:40px;background:var(--nameColBg)}
+  .cell.selected{outline:2px solid var(--accent); outline-offset:-2px;}
+  .cell.search-hit{box-shadow: inset 0 0 0 3px #f59e0b;}
+
+  .chip{
+    position:absolute; inset:2px; display:flex; align-items:center; justify-content:center;
+    border-radius:12px; border:1px solid var(--chipBorder); background:var(--chip);
+    font-weight:700; cursor:grab; user-select:none; padding:0 16px; font-size:18px; 
+    white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+  .chip:active{cursor:grabbing}
+  .chip.ts1{color:#ef4444} .chip.ts2{color:#3b82f6}
+  .chip.att{color:#f59e0b} .chip.training{color:#0ea5e9} .chip.rec{color:#8b5cf6}
+  .chip.holiday{background:var(--holiday); color:#fff}
+  .chip.hidden{display:none}
+
+  .droptarget{outline:2px dashed #3aa0ff; outline-offset:-3px}
+  .dragging{opacity:.8; transform:scale(0.99)}
+  .hidden{display:none}
+
+  .cell.editing .chip{ display:none !important; }
+  .cell.editing input{ display:block !important; }
+
+  tr.today td:not(.count){ background: var(--todayRow); }
+  tr.today .rowhdr{ color:#0f1720; }
+
+  .terminal{
+    background:#0b0b0b;border:1px solid var(--border);border-radius:14px;padding:10px;color:#c7d1db;
+    font:12px/1.4 ui-monospace,SFMono-Regular,Consolas,Monaco,monospace;height:220px;overflow-y:auto;overflow-x:hidden;word-break:break-word;
+  }
+  .ln{white-space:pre-wrap;margin:2px 0}
+  .ln.info{color:#9bb0c9} .ln.ok{color:#16a34a} .ln.warn{color:#f59e0b} .ln.err{color:#ef4444}
+
+  /* Context menu */
+  .ctx{position:fixed; z-index:9999; background:#10151c; color:#e2e8f0; border:1px solid #2a3441; border-radius:10px; box-shadow:0 12px 28px rgba(0,0,0,.35); padding:6px; min-width:180px; display:none}
+  .ctx .itm{padding:8px 10px; border-radius:8px; cursor:pointer; user-select:none}
+  .ctx .itm:hover,.ctx .itm:focus{background:#1b2532; outline:none}
+  .ctx .sep{height:1px; background:#233042; margin:6px 4px}
+  .ln.ln-cell{ background: transparent; padding: 0; margin: 2px 0; }
+  .terminal .ln{ background: transparent !important; }
+  .terminal .ln.ln-cell{ background: transparent !important; padding: 0; margin: 2px 0; }
+#calendar {table-layout: fixed; width:100%; border-collapse: collapse;}
+th.datecol, td.datecol {width:100px; min-width:100px; max-width:100px;}
+td, th {padding: 2px 4px;}
+#calendar-container {margin-left:0;margin-right:0;padding-left:4px;padding-right:4px;max-width:100%;}
+#calendar {margin-left:0;margin-right:0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Planny (HTML)</h1>
+
+  <div class="card">
+    <div class="bar">
+      <div><label>Anno</label><input id="year" type="number" min="1900" max="2100" disabled /></div>
+      <div><label>Nomi Team</label><input id="names" type="text" disabled /></div>
+      <div><label>Opzioni</label><input id="options" type="text" disabled /></div>
+      <div style="grid-column: span 5"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:10px">
+    <div class="tabsbar">
+      <div class="tabs" id="tabs"></div>
+      <div class="bar-right">
+        <div class="searchbox">
+          <input id="search-q" type="text" placeholder="Cerca impegno…" />
+          <button id="search-prev" class="btn mini" title="Precedente">Prev</button>
+          <button id="search-next" class="btn mini" title="Successivo">Next</button>
+          <div id="search-count" class="search-count">0/0</div>
+        </div>
+        <button id="jump-today" class="btn mini" title="Vai a oggi">Oggi</button>
+      </div>
+    </div>
+    <div id="month" class="month">
+      <table id="calendar">
+        <thead id="thead"></thead>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:10px">
+    <h2 style="margin:0 0 8px;font-size:14px;color:#9bb0c9">Terminale</h2>
+    <div id="terminal" class="terminal" aria-live="polite" aria-atomic="false"></div>
+  </div>
+</div>
+
+<!-- Context menu -->
+<div id="ctx" class="ctx" role="menu" aria-hidden="true">
+  <div class="itm" data-cmd="copy" tabindex="0">Copia</div>
+  <div class="itm" data-cmd="paste" tabindex="0">Incolla</div>
+  <div class="sep"></div>
+  <div class="itm" data-cmd="clear" tabindex="0">Cancella</div>
+</div>
+
+<datalist id="options-list"></datalist>
+
+<script>
+(function(){
+  /* ------- Logger ------- */
+  const logBuffer = []; let logFlushCursor = 0;
+  function log(msg, type='info'){
+    // Sempre in DevTools
+    (type==='err'?console.error:type==='warn'?console.warn:console.log)(msg);
+    // Solo i log di tipo 'cell' finiscono nel terminale + buffer persistente
+    if(type !== 'cell') return;
+    const t = document.getElementById('terminal');
+    const ts = new Date().toLocaleTimeString();
+    const text = '['+ts+'] '+msg;
+    logBuffer.push(text);
+    if(t){
+      const line = document.createElement('div');
+      line.className='ln ln-cell';
+      line.textContent=text;
+      t.appendChild(line);
+      t.scrollTop = t.scrollHeight;
+    }
+  }
+  // Azioni strutturate sui chip/celle
+  function logAction(action, date, name, value, extra){
+    const line = `${action} ${date}, ${name}${value!==undefined && value!==''?','+value:''}${extra? ' '+extra: ''}`;
+    log(line,'cell');
+  }
+  window.addEventListener('error', ev=>log('JS error: '+ev.message,'err'));
+  window.addEventListener('unhandledrejection', ev=>log('Promise: '+(ev.reason?.message||ev.reason),'err'));
+
+  /* ------- Stato ------- */
+  const state = {
+    year: new Date().getFullYear(),
+    names: [], options: [],
+    selections: new Map(),
+    columnOrder: null, holidays: new Set(),
+    stackTop:null, stackBottom:null, stackCenter:null,
+    anchorCell: null, selected: new Set(),
+    clipboard: null,
+    ctxTarget: null,
+    search: {q:'', hits:[], idx:-1}
+  };
+  // Espongo lo state per script esterni (year_single_selector.js)
+  window.state = state;
+  state.deletions = new Set();
+  const save = { selName:'', logName:'' };
+
+  const $=s=>document.querySelector(s);
+  const months=["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"];
+  const pad=n=>(n<10?"0":"")+n;
+  const fmt=d=>pad(d.getDate())+"-"+pad(d.getMonth()+1)+"-"+d.getFullYear();
+  const cssEscape = (s)=> (window.CSS && CSS.escape ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_-]/g, ch => '\\'+ch));
+
+  /* ------- Suggestions (prefix-based) ------- */
+  const suggest = {
+    box: null, items: [], index: -1, input: null,
+    ensureBox(){
+      if(this.box) return this.box;
+      const el = document.createElement('div'); el.className='sugg'; el.id='suggestions';
+      // style inline to avoid missing CSS in refactor
+      el.style.position='fixed'; el.style.zIndex='10000'; el.style.background='#fff'; el.style.border='1px solid var(--border)';
+      el.style.borderRadius='10px'; el.style.boxShadow='0 10px 24px rgba(0,0,0,.15)'; el.style.padding='4px'; el.style.display='none';
+      el.style.maxHeight='240px'; el.style.overflow='auto'; el.style.minWidth='140px';
+      document.body.appendChild(el);
+      this.box = el;
+      el.addEventListener('mousedown', (e)=>{
+        const it = e.target.closest('.it'); if(!it) return;
+        e.preventDefault();
+        const idx = Array.from(this.box.querySelectorAll('.it')).indexOf(it);
+        this.apply(idx);
+      });
+      return el;
+    },
+    open(input){
+      this.ensureBox();
+      this.input = input; this.index = -1;
+      this.update();
+      this.position();
+      this.box.style.display = (this.items.length? 'block':'none');
+    },
+    close(){ if(this.box){ this.box.style.display='none'; } this.input=null; this.index=-1; this.items=[]; },
+    position(){
+      if(!this.input || !this.box) return;
+      const r = this.input.getBoundingClientRect();
+      this.box.style.left = Math.round(r.left) + 'px';
+      this.box.style.top  = Math.round(r.bottom + 4) + 'px';
+      this.box.style.minWidth = Math.max(140, Math.round(r.width)) + 'px';
+    },
+    update(){
+      if(!this.input) return;
+      const q = (this.input.value||'').trim().toLowerCase();
+      if(!q){ this.items=[]; this.render(); return; }
+      const opts = (state.options||[]).slice();
+      const pref = opts.filter(o=> (o||'').toLowerCase().startsWith(q));
+      this.items = pref.slice(0, 20);
+      this.render();
+    },
+    render(){
+      if(!this.box) return;
+      this.box.innerHTML = this.items.map((t,i)=>`<div class="it${i===this.index?' active':''}" style="padding:8px 10px;border-radius:8px;cursor:pointer;white-space:nowrap">${t}</div>`).join('');
+    },
+    move(delta){
+      if(!this.items.length){ this.index=-1; this.render(); return; }
+      this.index = ( (this.index + delta) % this.items.length + this.items.length ) % this.items.length;
+      this.render();
+    },
+    apply(idx=null){
+      if(idx==null) idx=this.index;
+      if(idx<0 || idx>=this.items.length || !this.input) return;
+      const val = this.items[idx];
+      this.input.value = val;
+      const p=this.input.dataset.date.split('-'); const d=new Date(+p[2], +p[1]-1, +p[0]);
+      styleCell(this.input, val, d);
+      this.close();
+      setTimeout(()=>{ this.input.focus(); this.input.selectionStart=this.input.selectionEnd=this.input.value.length; },0);
+    }
+  };
+  window.addEventListener('resize', ()=> suggest.position());
+  window.addEventListener('scroll', ()=> suggest.position(), true);
+
+  /* ------- Helpers fetch/file ------- */
+  async function fetchText(path){
+    try{
+      const r=await fetch(path,{cache:'no-cache'});
+      if(!r.ok){ log(`fetchText ${path} -> HTTP ${r.status}`,'warn'); return null; }
+      return await r.text();
+    }catch(e){
+      log(`fetchText ${path} errore: ${e.message}`,'warn');
+      return null;
+    }
+  }
+
+  // Espongo importer selections per year_single_selector.js
+  window.importSelectionsFromText = importSelectionsFromText;
+  window.__SINGLE_IMPORTER = "importSelectionsFromText";
+  async function fetchJSON(url){
+    try{
+      const r=await fetch(url,{cache:'no-cache'});
+      if(!r.ok){ log(`fetchJSON ${url} -> HTTP ${r.status}`,'warn'); return null; }
+      return await r.json();
+    }catch(e){
+      log(`fetchJSON ${url} errore: ${e.message}`,'warn');
+      return null;
+    }
+  }
+
+  // Espongo importer selections per year_single_selector.js
+  window.importSelectionsFromText = importSelectionsFromText;
+  async function putTextToServer(name, content){
+    const r = await fetch(`/api/files/${encodeURIComponent(name)}`, {
+      method:'PUT', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:content
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.json().catch(()=>({ok:true}));
+  }
+  async function getTextFromServer(name){
+    const r = await fetch(`/api/files/${encodeURIComponent(name)}`);
+    if(r.status===404) return null;
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.text();
+  }
+  function downloadTextFile(name, text){
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));
+    a.download=name; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),0);
+  }
+
+  /* ------- Parser INI & colonne ------- */
+  function parseIni(text){
+    const out={}; let section=null;
+    text.split(/\r?\n/).forEach(raw=>{
+      const line=raw.trim(); if(!line || line.startsWith(';') || line.startsWith('#')) return;
+      const m=line.match(/^\[(.+?)\]$/);
+      if(m){ section=m[1]; out[section]=out[section]||{}; return; }
+      const kv=line.split('='); if(kv.length>=2){ const k=kv.shift().trim(); const v=kv.join('=').trim().replace(/^"|"$/g,''); (section?out[section]:out)[k]=v; }
+    });
+    return out;
+  }
+  function parseTabellaIni(text){
+    return text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean).filter(x=>x.toLowerCase()!=='data');
+  }
+  function getColumns(){ return state.names || []; }
+
+  /* ------- Log ------- */
+  function logsChunkSinceCursor(){
+    if(logFlushCursor>=logBuffer.length) return '';
+    const chunk = logBuffer.slice(logFlushCursor).join('\n') + '\n';
+    logFlushCursor = logBuffer.length;
+    return chunk;
+  }
+  async function appendLogsToServer(opts={force:false}){
+    const name = save.logName || (`planny_log_${state.year}.txt`);
+    let chunk = logsChunkSinceCursor();
+    if(!chunk && opts.force){
+      const t = new Date().toLocaleString();
+      chunk = `[${t}] Sessione avviata su ${location.href}\n`;
+    }
+    if(!chunk) return;
+    try{
+      const prev = await getTextFromServer(name);
+      const merged = (prev || '') + chunk;
+      await putTextToServer(name, merged);
+      log('Log aggiornato (PUT) su server: '+name, 'ok');
+    }catch(err){
+      log('Impossibile aggiornare il log via PUT: '+err.message,'warn');
+    }
+  }
+
+  // Espongo importer selections per year_single_selector.js
+  window.importSelectionsFromText = importSelectionsFromText;
+
+  /* ------- Config helpers ------- */
+  function parseYearFromConfigTxt(text){
+    let year=null;
+    text.split(/\r?\n/).forEach(line=>{
+      const t=line.trim();
+      if(!t || t.startsWith('#') || t.startsWith('//')) return;
+      const m = t.match(/^\s*(ANNO|YEAR|ANNO_CALENDARIO)\s*[:=]\s*(\d{4})\s*$/i);
+      if(m){ year = parseInt(m[2],10); }
+    });
+    return year;
+  }
+
+  /* ------- Selections (file) ------- */
+  function selectionsFileName(){ return `selections_${state.year}.txt`; }
+  function selectionsToText(){
+    const entries=[...state.selections.entries()].map(([k,v])=>({k,v,del:false}));
+    const dels=[...state.deletions].map(k=>({k,v:'__DEL__',del:true}));
+    const all = entries.concat(dels);
+    all.sort((a,b)=>{
+      const [ad,an]=a.k.split(','),[bd,bn]=b.k.split(',');
+      const pa=ad.split('-').reverse().join(''), pb=bd.split('-').reverse().join('');
+      const s = pa!==pb?pa.localeCompare(pb):an.localeCompare(bn);
+      if(s!==0) return s;
+      // A parità di chiave, scrivi prima i valori poi le DEL? Meglio DEL dopo per prevalere.
+      return (a.del===b.del)?0:(a.del?1:-1);
+    });
+    return all.map(o=>o.k+','+o.v).join('\n')+'\n';
+  }
+  async function saveSelectionsToServer(){
+    const name = selectionsFileName();
+    try{
+      const text = selectionsToText();
+      await putTextToServer(name, text);
+      try{ localStorage.setItem('selections_'+state.year, text); }catch(_){}
+      try{
+        const again = await getTextFromServer(name);
+        if(again && again.trim() !== text.trim()){
+          console.warn('Round-trip mismatch su selections: server ha testo diverso.');
+        }
+      }catch(_){ }
+      log('Selections salvati su server: '+name, 'ok');
+    }catch(err){
+      log('Server non disponibile per selections (download locale): '+err.message,'warn');
+      const text = selectionsToText();
+      try{ localStorage.setItem('selections_'+state.year, text); }catch(_){}
+      downloadTextFile(name, text);
+    }
+  }
+
+  // Espongo importer selections per year_single_selector.js
+  window.importSelectionsFromText = importSelectionsFromText;
+
+  /* ------- Festività ------- */
+  async function loadHolidaysFromLocalOrWeb(){
+    const fname = `festivi_${state.year}.txt`;
+    try{
+      const txt = await getTextFromServer(fname) || await fetchText(fname);
+      if (txt){
+        const set = new Set();
+        txt.split(/\r?\n/).forEach(line=>{
+          const t=line.trim();
+          if(!t || t.startsWith('#')) return;
+          if(/^\d{2}-\d{2}-\d{4}$/.test(t)) set.add(t);
+        });
+        state.holidays = set;
+        log(`Festivi caricati da ${fname}: ${set.size} date`,'ok');
+        return;
       }
+    }catch(_){}
+
+    log('Festivi non trovati: scarico dal web…','warn');
+    const url = `https://date.nager.at/api/v3/PublicHolidays/${state.year}/IT`;
+    const data = await fetchJSON(url);
+    if (Array.isArray(data) && data.length){
+      const set = new Set(); const lines = [];
+      data.forEach(item=>{
+        const d = (item.date||'').split('-'); // YYYY-MM-DD
+        if(d.length===3){ const s = `${d[2]}-${d[1]}-${d[0]}`; set.add(s); lines.push(s); }
+      });
+      if(set.size){
+        state.holidays = set;
+        log('Festivi ottenuti dal web: '+set.size,'ok');
+        await saveFestiviToServer(state.year, lines);
+        return;
+      }
+    }
+
+    state.holidays = italianHolidays(state.year);
+    log(`Impossibile scaricare i festivi: uso calcolo automatico (${state.holidays.size} date).`,'warn');
+  }
+  function easterDate(y){
+    const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4;
+    const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4), k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31);
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(y, month - 1, day);
+  }
+  function italianHolidays(year){
+    const set = new Set();
+    const pad = n => (n<10?'0':'') + n;
+    const add = (d) => set.add(pad(d.getDate()) + '-' + pad(d.getMonth()+1) + '-' + d.getFullYear());
+    [[1,1],[1,6],[4,25],[5,1],[6,2],[8,15],[11,1],[12,8],[12,25],[12,26]].forEach(([m, d])=>{
+      add(new Date(year, m-1, d));
+    });
+    const easter = easterDate(year);
+    const easterMon = new Date(easter); easterMon.setDate(easter.getDate()+1);
+    add(easterMon);
+    return set;
+  }
+  async function saveFestiviToServer(year, lines){
+    const name = `festivi_${year}.txt`;
+    const payload = lines.join('\n') + '\n';
+    const endpoint = `/api/files/${encodeURIComponent(name)}`;
+
+    async function putNow(){
+      const r = await fetch(endpoint, {
+        method: 'PUT',
+        headers: {'Content-Type':'text/plain;charset=utf-8'},
+        body: payload
+      });
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      return true;
+    }
+
+    try{
+      await putNow();
+      log('Festivi salvati su server: ' + name, 'ok');
+      try{
+        const q = JSON.parse(localStorage.getItem('pendingFestivi') || '[]').filter(x => x.name !== name);
+        localStorage.setItem('pendingFestivi', JSON.stringify(q));
+      }catch(_){}
+      return;
+    }catch(err){
+      log('Server non disponibile ora per festivi: accodo e ritento in background. ' + (err.message || err), 'warn');
+      try{
+        const q = JSON.parse(localStorage.getItem('pendingFestivi') || '[]');
+        const i = q.findIndex(x => x.name === name);
+        const rec = { name, payload };
+        if(i >= 0) q[i] = rec; else q.push(rec);
+        localStorage.setItem('pendingFestivi', JSON.stringify(q));
+        scheduleFestiviRetry(1500);
+      }catch(e){
+        log('Impossibile accodare festivi in localStorage: ' + (e.message || e), 'err');
+      }
+    }
+  }
+
+  // Espongo importer selections per year_single_selector.js
+  window.importSelectionsFromText = importSelectionsFromText;
+  let _festiviRetryTimer = null;
+  async function retryFestiviQueue(){
+    let q = [];
+    try{ q = JSON.parse(localStorage.getItem('pendingFestivi') || '[]'); }catch(_){ q = []; }
+    if(!q.length) return;
+    const next = [];
+    for(const item of q){
+      try{
+        const r = await fetch(`/api/files/${encodeURIComponent(item.name)}`, {
+          method: 'PUT',
+          headers: {'Content-Type':'text/plain;charset=utf-8'},
+          body: item.payload
+        });
+        if(!r.ok) throw new Error('HTTP ' + r.status);
+        log('Festivi (retry) salvati: ' + item.name, 'ok');
+      }catch(e){
+        next.push(item);
+      }
+    }
+    localStorage.setItem('pendingFestivi', JSON.stringify(next));
+    if(next.length){ scheduleFestiviRetry(5000); }
+  }
+  function scheduleFestiviRetry(delay){
+    clearTimeout(_festiviRetryTimer);
+    _festiviRetryTimer = setTimeout(retryFestiviQueue, delay || 0);
+  }
+  scheduleFestiviRetry(2000);
+  // Espongo per script esterni
+  window.loadHolidaysFromLocalOrWeb = loadHolidaysFromLocalOrWeb;
+
+  /* ------- Import selections (parsing) ------- */
+  function importSelectionsFromText(txt){
+
+    txt = (typeof txt === 'string') ? txt : (window.__singleSelectionsText || '');
+    if (!txt) { try{ console.debug('importSelectionsFromText: empty payload, skip'); }catch(_){ } return; }
+    try{ var __digest = 'len:' + txt.length + '|head:' + txt.slice(0,64) + '|tail:' + txt.slice(-64); if (window.__lastSelectionsDigest === __digest) { return; } window.__lastSelectionsDigest = __digest; }catch(_){}
+
+    const map=new Map(); let n=0; const yearCount = {};
+    txt.split(/\r?\n/).forEach(line=>{
+      const t=line.trim(); if(!t) return;
+      const parts=t.split(','); if(parts.length<3) return;
+      const date=parts[0].trim(), name=parts[1].trim(), value=parts.slice(2).join(',').trim();
+      const y = parseInt(date.split('-')[2],10); if(!isNaN(y)) yearCount[y]=(yearCount[y]||0)+1;
+      const key = `${date},${name}`;
+      if(value==='__DEL__' || value==='DEL' || value==='__DELETE__'){
+        map.delete(key);
+      }else{
+        map.set(key, value);
+      }
+      n++;
+    });
+    state.selections=map; state.deletions = new Set();
+    log(`Selections caricati: ${n} righe`,'ok');
+    let yBest=null, cBest=0; for(const y in yearCount){ if(yearCount[y]>cBest){ cBest=yearCount[y]; yBest=parseInt(y,10);} }
+    if(yBest && yBest!==state.year){
+      state.year = yBest;
+      const yearInput=$('#year'); if(yearInput) yearInput.value=state.year;
+      log('Anno planner riallineato ai selections: '+state.year,'ok');
+      loadHolidaysFromLocalOrWeb().then(()=>{
+        const m = (new Date().getFullYear()===state.year)?(new Date().getMonth()+1):1;
+        renderStack(m);
+      });
+    }
+  }
+
+  // Espongo importer selections per year_single_selector.js
+  window.importSelectionsFromText = importSelectionsFromText;
+
+  /* ------- Editing / Commit ------- */
+  function enterEdit(td){
+    td.classList.add('editing');
+    const input=td.querySelector('input'), chip=td.querySelector('.chip');
+    chip.classList.add('hidden'); input.classList.remove('hidden');
+    input.dataset.orig=input.value; setTimeout(()=>{input.focus(); input.select(); suggest.open(input);},0);
+  }
+  function onCellCommit(input){
+    // delega a writeCell per garantire logging unico
+    const td = input.closest('td.cell');
+    const val = (input.value || '').trim();
+    writeCell(td, val);
+    if(state.search.q) buildSearchHits(state.search.q);
+  }
+  function exitEdit(td, saveIt){
+    const input=td.querySelector('input'); if(!input)return;
+    if(saveIt){ onCellCommit(input); } else { input.value=input.dataset.orig||input.value; }
+    td.classList.remove('editing');
+    syncChip(td);
+    if(saveIt){ saveNow(); }
+  }
+
+  function styleToken(val){
+    const lo=(val||'').toLowerCase();
+    if(val==='TS1')return'ts1';
+    if(val==='TS2')return'ts2';
+    if(['ferie','par','assente','permesso','malattia','meeting','trasferta'].includes(lo))return'att';
+    if(lo==='training')return'training';
+    if(val==='REC FERIE')return'rec';
+    return'';
+  }
+  function isHolidayOrWeekend(d){return [6,0].includes(d.getDay()) || state.holidays.has(fmt(d))}
+
+  function writeCell(td, val){
+    // logging per-cella centralizzato: usa lo stato come 'prev'
+    const key = td.dataset.key;
+    const prevVal = (state.selections.get(key) || '').trim();
+    const input = td.querySelector('input');
+    input.value = (val||'');
+    const p = td.dataset.date.split('-');
+    const d = new Date(+p[2], +p[1]-1, +p[0]);
+    if(val) state.selections.set(key, val); else state.selections.delete(key);
+    const date = td.dataset.date; const name = td.dataset.name;
+    if(prevVal && !val){ state.deletions.add(key); logAction('DELETE', date, name, prevVal); }
+    else if(!prevVal && val){ if(state.deletions.has(key)) state.deletions.delete(key); logAction('SET', date, name, val); }
+    else if(prevVal && val && prevVal!==val){ if(state.deletions.has(key)) state.deletions.delete(key); logAction('UPDATE', date, name, `${prevVal} -> ${val}`); }
+    styleCell(input, val, d);
+    syncChip(td);
+    updateRowCount(td.closest('tr'));
+  }
+
+  // Chiudi tutte le celle in editing tranne (eventualmente) una
+function closeAllEditingExcept(skipTd){
+  document.querySelectorAll('td.cell.editing').forEach(el => {
+    if(el !== skipTd){
+      try { exitEdit(el, true); } catch(_){ /* ignore */ }
+    }
+  });
+}
+
+function makeCell(date,name){
+    const td=document.createElement('td'); td.className='cell'; td.dataset.date=fmt(date); td.dataset.name=name; td.dataset.key=td.dataset.date+','+name;
+    const input=document.createElement('input'); input.dataset.key=td.dataset.key; input.dataset.date=td.dataset.date; input.dataset.name=name;
+    const chip=document.createElement('div'); chip.className='chip hidden'; chip.draggable=true;
+
+    /* --- Gestione selezione --- */
+    td.addEventListener('mousedown', (e)=>{ closeAllEditingExcept(td);
+      if(e.button!==0) return;
+      if(e.target.closest('.chip')) return;
+      selectionHandleMouse(td, e);
+    });
+
+    td.addEventListener('dblclick', (e)=>{ 
+      if(e.target.closest('.chip')) return; 
+      e.preventDefault(); e.stopPropagation(); 
+      enterEdit(td); 
+    });
+    chip.addEventListener('dblclick', e=>{e.preventDefault(); e.stopPropagation(); enterEdit(td);});
+    chip.addEventListener('click', (e)=>{ if (window.matchMedia('(pointer: coarse)').matches) { e.preventDefault(); e.stopPropagation(); enterEdit(td); }});
+
+    input.addEventListener('focus', () => { input.dataset.orig = input.value; td.classList.add('editing'); });
+    input.addEventListener('keydown', e=>{
+      if(e.key==='ArrowDown'){ e.preventDefault(); suggest.move(+1); return; }
+      if(e.key==='ArrowUp'){ e.preventDefault(); suggest.move(-1); return; }
+      if(e.key==='Tab'){ if(suggest.items.length){ e.preventDefault(); suggest.apply(); } return; }
+      if(e.key==='Enter'){
+        if(suggest.items.length){ e.preventDefault(); suggest.apply(); exitEdit(td,true); }
+        else { e.preventDefault(); exitEdit(td,true); }
+        return;
+      }
+      if(e.key==='Escape'){ e.preventDefault(); suggest.close(); exitEdit(td,false); return; }
+    });
+    input.addEventListener('blur', ()=>{ suggest.close(); exitEdit(td,true); });
+    input.addEventListener('input', ()=>{
+      const p=input.dataset.date.split('-'); const d=new Date(+p[2], +p[1]-1, +p[0]);
+      styleCell(input,(input.value||'').trim(),d);
+      suggest.open(input);
+    });
+
+    td.addEventListener('dragover', e=>{ e.preventDefault(); td.classList.add('droptarget'); });
+    td.addEventListener('dragleave', ()=> td.classList.remove('droptarget'));
+    td.addEventListener('drop', e=>{
+      e.preventDefault(); td.classList.remove('droptarget');
+      const payload=e.dataTransfer.getData('application/x-planny'); if(!payload) return;
+      let data=null; try{data=JSON.parse(payload);}catch(_){}
+      if(!data) return;
+      const fromKey=data.fromKey, value=data.value, toKey=td.dataset.key;
+      if(fromKey===toKey) return;
+      const prev=state.selections.get(toKey)||'';
+      if(e.shiftKey && prev){
+        state.selections.set(fromKey, prev);
+        state.selections.set(toKey, value);
+        const [fDate,fName] = fromKey.split(',');
+        const [tDate,tName] = toKey.split(',');
+        logAction('SWAP', fDate, fName, value, `⇄ ${tDate}, ${tName},${prev}`);
+        refreshCellByKey(fromKey); refreshCellByKey(toKey);
+        saveNow();
+      }else{
+        state.selections.delete(fromKey);
+        if(value) state.selections.set(toKey, value);
+        const [fDate,fName] = fromKey.split(',');
+        const [tDate,tName] = toKey.split(',');
+        logAction('MOVE', fDate, fName, value, `→ ${tDate}, ${tName}${prev? ',(overwrite '+prev+')':''}`);
+        refreshCellByKey(fromKey); refreshCellByKey(toKey);
+        saveNow();
+      }
+      scheduleAutoSave();
+    });
+
+    chip.addEventListener('dragstart', e=>{
+      chip.classList.add('dragging');
+      const key=td.dataset.key;
+      let value=state.selections.get(key); if(value==null) value=(input.value||'').trim();
+      e.dataTransfer.setData('application/x-planny', JSON.stringify({fromKey:key, value}));
+      e.dataTransfer.setData('text/plain', value); e.dataTransfer.effectAllowed='move';
+    });
+    chip.addEventListener('dragend', ()=> chip.classList.remove('dragging'));
+
+    td.appendChild(input); td.appendChild(chip); return td;
+  }
+
+  function syncChip(td){
+    const input=td.querySelector('input'), chip=td.querySelector('.chip');
+    const val=(input.value||'').trim();
+    if(td.classList.contains('editing')){ chip.classList.add('hidden'); input.classList.remove('hidden'); return; }
+    if(val){
+      chip.textContent=val;
+      chip.title = val;
+      let klass='chip '+styleToken(val);
+      const parts=td.dataset.date.split('-'); const d=new Date(+parts[2], +parts[1]-1, +parts[0]);
+      if(isHolidayOrWeekend(d)) klass+=' holiday';
+      chip.className=klass; chip.classList.remove('hidden'); input.classList.add('hidden');
+    }else{
+      chip.removeAttribute('title');
+      chip.textContent=''; chip.className='chip hidden'; input.classList.remove('hidden');
+    }
+  }
+
+  // Espongo importer selections per year_single_selector.js
+  window.importSelectionsFromText = importSelectionsFromText;
+  function refreshCellByKey(key){
+    const td=document.querySelector('td.cell[data-key="'+cssEscape(key)+'"]'); if(!td) return;
+    const input=td.querySelector('input'); input.value=state.selections.get(key)||'';
+    const p=td.dataset.date.split('-'); const d=new Date(+p[2], +p[1]-1, +p[0]);
+    styleCell(input,input.value,d); syncChip(td); updateRowCount(td.closest('tr'));
+  }
+  function updateRowCount(tr){
+    const inputs=[...tr.querySelectorAll('input')];
+    const filled=inputs.reduce((a,i)=>a+(i.value.trim()?1:0),0);
+    const total=inputs.length;
+    const tdCount=tr.querySelector('.count');
+    tdCount.textContent=filled; tdCount.className='count '+countClass(filled,total);
+  }
+
+  /* ------- Header / mesi (scroll continuo) ------- */
+  function updateScrollSnapPadding(){
+    const c=document.querySelector('#month'); const thead=document.querySelector('#thead');
+    if(!c || !thead) return;
+    const h = Math.round(thead.getBoundingClientRect().height) || 0;
+    c.style.scrollPaddingTop = h + 'px';
+  }
+  function buildHeader(){
+    updateScrollSnapPadding();
+    const names=getColumns();
+    const thead = document.getElementById('thead');
+    thead.innerHTML='';
+    const hr=document.createElement('tr');
+    const thD=document.createElement('th'); thD.className='datecol'; thD.textContent='Data'; hr.appendChild(thD);
+    names.forEach(n=>{ const th=document.createElement('th'); th.className='name'; th.textContent=n; hr.appendChild(th); });
+    const thC=document.createElement('th'); thC.className='small'; thC.textContent=' '; hr.appendChild(thC);
+    thead.appendChild(hr);
+  }
+  function daysInMonth(y,m){ return new Date(y, m, 0).getDate(); }
+  function makeMonthSection(m){
+    const y=state.year, names=getColumns();
+    const tbody=document.createElement('tbody'); tbody.dataset.m=m;
+    const days=daysInMonth(y,m);
+    for(let d=1; d<=days; d++){
+      const tr=document.createElement('tr'); const dateObj=new Date(y, m-1, d); tr.dataset.date=fmt(dateObj);
+      const dow=['Dom','Lun','Mar','Mer','Gio','Ven','Sab'][dateObj.getDay()];
+	  const mon = months[m-1];  // mese abbreviato
+      const tdDate=document.createElement('td');
+        tdDate.classList.add('datecol'); tdDate.innerHTML='<div class="rowhdr">'+mon+' '+dow+' '+pad(d)+'</div>'; tr.appendChild(tdDate);
+
+      let filled=0;
+      names.forEach(name=>{
+        const td=makeCell(dateObj,name), input=td.querySelector('input'), key=td.dataset.key, val=state.selections.get(key)||'';
+        if(val){ input.value=val; filled++; }
+        styleCell(input,input.value,dateObj); syncChip(td); tr.appendChild(td);
+      });
+
+      const tdCount=document.createElement('td'); tdCount.className='count '+countClass(filled,names.length); tdCount.textContent=filled; tr.appendChild(tdCount);
+      tbody.appendChild(tr);
+    }
+    return tbody;
+  }
+  function countClass(n,t){const q3=(3*t)/4,h=t/2,q=t/4;return n>q3?'c-red':n>h?'c-orange':n>q?'c-yellow':'c-white'}
+  function setActiveTab(m){
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    const btn=document.querySelector('.tab[data-m="'+m+'"]'); if(btn) btn.classList.add('active');
+    state.stackCenter = m;
+  }
+  let flipping=false;
+  function renderStack(centerMonth){
+    const table = document.getElementById('calendar');
+    const c=$('#month');
+    const prevScroll = c.scrollTop;
+    buildHeader();
+    table.querySelectorAll('tbody').forEach(tb=>tb.remove());
+    const start = Math.max(1, centerMonth-1);
+    const end   = Math.min(12, centerMonth+1);
+    let targetSection=null;
+    for(let m=start; m<=end; m++){
+      const sec = makeMonthSection(m);
+      table.appendChild(sec);
+      if(m===centerMonth) targetSection=sec;
+    }
+    state.stackTop = start; state.stackBottom = end; state.stackCenter = centerMonth;
+    setActiveTab(centerMonth);
+    updateScrollSnapPadding();
+    if(targetSection){ c.scrollTop = targetSection.offsetTop; }
+    else { c.scrollTop = prevScroll; }
+  }
+  function ensurePrevMonth(){
+    if(state.stackTop <= 1) return;
+    const table = document.getElementById('calendar');
+    const c=$('#month');
+    const newM = state.stackTop - 1;
+    const sec = makeMonthSection(newM);
+    table.insertBefore(sec, table.querySelector('tbody'));
+    const added = sec.offsetHeight;
+    c.scrollTop += added;
+    updateScrollSnapPadding();
+    state.stackTop = newM;
+  }
+  function ensureNextMonth(){
+    if(state.stackBottom >= 12) return;
+    const table = document.getElementById('calendar');
+    const newM = state.stackBottom + 1;
+    const sec = makeMonthSection(newM);
+    table.appendChild(sec);
+    state.stackBottom = newM;
+    updateScrollSnapPadding();
+  }
+  function monthNearestCenter(){
+    const c=$('#month'); const cRect=c.getBoundingClientRect(); const centerY = cRect.top + c.clientHeight/2;
+    let bestM=null, bestDist=Infinity;
+    document.querySelectorAll('#calendar tbody[data-m]').forEach(sec=>{
+      const r=sec.getBoundingClientRect(); const mid=r.top + r.height/2;
+      const dist=Math.abs(mid - centerY);
+      if(dist<bestDist){ bestDist=dist; bestM=parseInt(sec.dataset.m,10); }
+    });
+    return bestM||state.stackCenter||1;
+  }
+  function setupScrollHandlers(){
+    window.addEventListener('resize', updateScrollSnapPadding);
+    const c=$('#month'); if(!c) return;
+    c.addEventListener('scroll', (e)=>{
+      if(flipping) return;
+      const el=e.target;
+      const atTop = el.scrollTop <= 6;
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 6;
+
+      if(atTop && state.stackTop>1){
+        flipping=true; ensurePrevMonth(); setTimeout(()=>flipping=false, 50);
+      }else if(atBottom && state.stackBottom<12){
+        flipping=true; ensureNextMonth(); setTimeout(()=>flipping=false, 50);
+      }
+
+      const m = monthNearestCenter();
+      if(m !== state.stackCenter){ setActiveTab(m); }
+    }, {passive:true});
+  }
+
+  /* ------- Stile celle ------- */
+  function styleCell(input,val,date){
+    input.classList.remove('holiday'); input.style.color=''; input.style.fontWeight=''; input.style.fontSize='';
+    if([6,0].includes(date.getDay()) || state.holidays.has(fmt(date))) input.classList.add('holiday');
+    const lo=(val||'').toLowerCase();
+    if(val==='TS1'){ input.style.color='#ef4444'; input.style.fontWeight='700'; input.style.fontSize='18px'; }
+    else if(val==='TS2'){ input.style.color='#3b82f6'; input.style.fontWeight='700'; input.style.fontSize='18px'; }
+    else if(['ferie','par','assente','permesso','malattia','meeting','trasferta'].includes(lo)){ input.style.color='#f59e0b'; input.style.fontWeight='700'; input.style.fontSize='18px'; }
+    else if(lo==='training'){ input.style.color='#0ea5e9'; input.style.fontWeight='700'; input.style.fontSize='18px'; }
+    else if(val==='REC FERIE'){ input.style.color='#8b5cf6'; input.style.fontWeight='700'; input.style.fontSize='18px'; }
+  }
+
+  /* ------- Export XLSX via server (auto, salva in /public) ------- */
+  function makeWorkbookData(){
+    const y=state.year, names=getColumns(), monthly=new Map(); for(let m=1;m<=12;m++) monthly.set(m,new Map());
+    for(const [k,v] of state.selections.entries()){
+      const [dateStr,name]=k.split(',');
+      const d=dateStr.split('-').map(Number); const yyyy=d[2], mm=d[1];
+      if(yyyy!==y) continue;
+      if(!monthly.get(mm).has(dateStr)) monthly.get(mm).set(dateStr,{});
+      monthly.get(mm).get(dateStr)[name]=v;
+    }
+    const headers=['Data'].concat(names), sheets={};
+    for(let m=1;m<=12;m++){
+      const rows=[headers], total=new Date(y,m,0).getDate();
+      for(let d=1; d<=total; d++){
+        const date=new Date(y,m-1,d), dateStr=fmt(date);
+        const row=headers.map(h=> h==='Data'?dateStr:(monthly.get(m).get(dateStr)||{})[h]||'');
+        rows.push(row);
+      }
+      sheets[months[m-1]]=rows;
+    }
+    return {sheets};
+  }
+  async function exportXLSXServerSave(){
+    try{
+      const data = makeWorkbookData();
+      const name = 'monthly_data_'+state.year+'.xlsx';
+      const r = await fetch('/api/export/xlsx/save', {
+        method:'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ filename: name, sheets: data.sheets })
+      });
+      if(!r.ok){
+        const txt = await r.text().catch(()=> '');
+        throw new Error('HTTP '+r.status+' '+txt);
+      }
+      const js = await r.json().catch(()=>null);
+      if(js && js.ok){
+        log('Excel aggiornato sul server: '+(js.path||name), 'ok');
+      }else{
+        log('Excel salvato (risposta non-JSON o senza ok).', 'warn');
+      }
+    }catch(e){
+      log('Errore salvataggio Excel server: '+(e.message||e), 'warn');
+    }
+  }
+
+  // Espongo importer selections per year_single_selector.js
+  window.importSelectionsFromText = importSelectionsFromText;
+
+  
+  /* ------- Year Change Glue (per script esterno) ------- */
+  function reconfigureAfterYearChange(){
+    try{
+      const yearInput=$('#year'); if(yearInput) yearInput.value=state.year;
+      save.selName = selectionsFileName();
+      save.logName = 'planny_log_'+state.year+'.txt';
+      loadHolidaysFromLocalOrWeb().then(()=>{
+        renderAndJumpToToday();
+        exportXLSXServerSave();
+        appendLogsToServer({force:true});
+      });
+    }catch(e){
+      log('Errore reconfigureAfterYearChange: '+(e.message||e),'warn');
+    }
+  }
+  // API attesa dallo script esterno: proviamo a mappare a questa funzione
+  window.renderCalendar = reconfigureAfterYearChange;
+
+  /* ------- Tabs / Oggi ------- */
+  function buildTabs(){
+    const tabs=$('#tabs'); tabs.innerHTML='';
+    const today=new Date();
+    const currentMonth = (today.getFullYear()===state.year) ? (today.getMonth()+1) : 1;
+    months.forEach((m,i)=>{
+      const monthIndex=i+1;
+      const b=document.createElement('button');
+      b.className='tab'+(monthIndex===currentMonth?' active':'');
+      b.textContent=m; b.dataset.m=monthIndex;
+      b.onclick=()=>{ renderStack(monthIndex); };
+      tabs.appendChild(b);
+    });
+  }
+  function jumpToToday(){
+    const today=new Date();
+    let m = today.getMonth()+1;
+    if(today.getFullYear()!==state.year){
+      state.year = today.getFullYear();
+      const yearInput=$('#year'); if(yearInput) yearInput.value=state.year;
+      log('Anno calendario riallineato a quello corrente: '+state.year,'warn');
+      loadHolidaysFromLocalOrWeb().then(()=>{
+        renderStack(m);
+        const tr=document.querySelector('tr[data-date="'+fmt(today)+'"]');
+        if(tr){ tr.classList.add('today'); document.querySelector('#month').scrollTo({top: Math.max(0, (tr.offsetTop - (document.querySelector('#thead')?Math.round(document.querySelector('#thead').getBoundingClientRect().height):0))), behavior:'smooth'}); setActiveTab(m); }
+      });
+      return;
+    }
+    renderStack(m);
+    const tr=document.querySelector('tr[data-date="'+fmt(today)+'"]');
+    if(tr){ tr.classList.add('today'); document.querySelector('#month').scrollTo({top: Math.max(0, (tr.offsetTop - (document.querySelector('#thead')?Math.round(document.querySelector('#thead').getBoundingClientRect().height):0))), behavior:'smooth'}); setActiveTab(m); log('Salto a oggi: '+fmt(today),'ok'); }
+  }
+  function renderAndJumpToToday(){
+    const today=new Date(); const sameYear = today.getFullYear()===state.year;
+    buildTabs(); renderStack(sameYear?(today.getMonth()+1):1); setupScrollHandlers();
+    if(sameYear){
+  const tr=document.querySelector('tr[data-date="'+fmt(today)+'"]');
+  if(tr){
+    tr.classList.add('today');
+    const c=document.getElementById('month');
+    const head=document.getElementById('thead');
+    const headH = head ? Math.round(head.getBoundingClientRect().height) : 0;
+    c.scrollTop = Math.max(0, tr.offsetTop - headH - 4);
+    setActiveTab(today.getMonth()+1);
+  }
+}
+  }
+
+  // Espongo importer selections per year_single_selector.js
+  window.importSelectionsFromText = importSelectionsFromText;
+
+  /* ------- AutoSave ------- */
+  async function saveNow(){
+    try{
+      await saveSelectionsToServer();
+      await appendLogsToServer();
+      await exportXLSXServerSave();
+    }catch(e){ log('Errore saveNow: '+(e.message||e),'warn'); }
+  }
+
+  let saveTimer=null;
+  function scheduleAutoSave(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async ()=>{
+      await saveSelectionsToServer();
+      await appendLogsToServer();
+      await exportXLSXServerSave();
+    }, 800);
+  }
+
+  /* ======== SELEZIONE + COPY/PASTE ======== */
+  function clearSelection(){
+    state.selected.forEach(td=>td.classList.remove('selected'));
+    state.selected.clear();
+  }
+  function addToSelection(td){
+    if(!td || !td.classList.contains('cell')) return;
+    if(!state.selected.has(td)){ state.selected.add(td); td.classList.add('selected'); }
+    state.anchorCell = td;
+  }
+  function toggleSelection(td){
+    if(state.selected.has(td)){ td.classList.remove('selected'); state.selected.delete(td); }
+    else addToSelection(td);
+  }
+  function selectionHandleMouse(td, e){
+    if(e.shiftKey && state.anchorCell){
+      selectRange(state.anchorCell, td);
+    }else if(e.ctrlKey || e.metaKey){
+      toggleSelection(td);
+    }else{
+      clearSelection();
+      addToSelection(td);
+    }
+  }
+
+  // Espongo importer selections per year_single_selector.js
+  window.importSelectionsFromText = importSelectionsFromText;
+  function selectRange(aTd, bTd){
+    if(!aTd || !bTd) return;
+    const table = document.getElementById('calendar');
+    const aRow = aTd.closest('tr').rowIndex;
+    const bRow = bTd.closest('tr').rowIndex;
+    const aCol = aTd.cellIndex;
+    const bCol = bTd.cellIndex;
+    const minR = Math.min(aRow, bRow), maxR = Math.max(aRow, bRow);
+    const minC = Math.min(aCol, bCol), maxC = Math.max(aCol, bCol);
+    clearSelection();
+    for(let r=minR; r<=maxR; r++){
+      const row = table.rows[r]; if(!row) continue;
+      for(let c=minC; c<=maxC; c++){
+        const cell = row.cells[c];
+        if(cell && cell.classList.contains('cell')) addToSelection(cell);
+      }
+    }
+  }
+
+  // Espongo importer selections per year_single_selector.js
+  window.importSelectionsFromText = importSelectionsFromText;
+  function selectionBounds(){
+    let minR=Infinity, maxR=-Infinity, minC=Infinity, maxC=-Infinity;
+    state.selected.forEach(td=>{
+      const r=td.closest('tr').rowIndex, c=td.cellIndex;
+      if(r<minR) minR=r; if(r>maxR) maxR=r; if(c<minC) minC=c; if(c>maxC) maxC=c;
+    });
+    if(minR===Infinity) return null;
+    return {minR,maxR,minC,maxC};
+  }
+  state._dragSelecting = false;
+  document.addEventListener('mousedown', (e)=>{
+    if(e.button!==0) return;
+    const td = e.target.closest('td.cell');
+    if(!td || e.target.closest('.chip') || td.classList.contains('editing')) return;
+    if(e.shiftKey || e.ctrlKey || e.metaKey) return;
+    state._dragSelecting = true;
+    clearSelection();
+    addToSelection(td);
+    e.preventDefault();
+  });
+  document.addEventListener('mouseup', ()=>{ state._dragSelecting=false; });
+  document.addEventListener('mouseleave', ()=>{ state._dragSelecting=false; });
+  document.addEventListener('mouseover', (e)=>{
+    if(!state._dragSelecting) return;
+    const td = e.target.closest && e.target.closest('td.cell');
+    if(td) selectRange(state.anchorCell, td);
+  });
+
+  function gridFromSelection(){
+    const b = selectionBounds(); if(!b) return {grid:[[]], w:0, h:0};
+    const table = document.getElementById('calendar');
+    const h = b.maxR - b.minR + 1;
+    const w = b.maxC - b.minC + 1;
+    const grid = Array.from({length:h},()=>Array(w).fill(''));
+    for(let r=b.minR; r<=b.maxR; r++){
+      const row = table.rows[r];
+      for(let c=b.minC; c<=b.maxC; c++){
+        const td = row.cells[c];
+        if(td && td.classList.contains('cell')){
+          const val = (td.querySelector('input').value || '').trim();
+          grid[r-b.minR][c-b.minC] = val;
+        }
+      }
+    }
+    return {grid,w,h};
+  }
+  function textFromGrid(grid){ return grid.map(row => row.join('\t')).join('\n'); }
+  function gridFromText(text){
+    const lines = text.replace(/\r/g,'').split('\n').filter(l=>l.length>0);
+    if(!lines.length) return {grid:[['']], w:1, h:1};
+    const useTab = lines.some(l=>l.includes('\t'));
+    const grid = lines.map(l=> (useTab? l.split('\t') : l.split(',')));
+    const w = Math.max(...grid.map(r=>r.length));
+    grid.forEach(r=>{ if(r.length<w) r.push(...Array(w-r.length).fill('')); });
+    return {grid, w, h:grid.length};
+  }
+  async function copySelectionToClipboard(){
+    if(state.selected.size===0){ log('Nessuna cella selezionata.','warn'); return; }
+    const {grid} = gridFromSelection();
+    const text = textFromGrid(grid);
+    try{
+      if(navigator.clipboard?.writeText){ await navigator.clipboard.writeText(text); }
+      else{
+        const ta=document.createElement('textarea');
+        ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta);
+        ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+      }
+      state.clipboard = {grid, w:grid[0]?.length||1, h:grid.length, text};
+      log(`Copiato ${state.clipboard.h}×${state.clipboard.w} dalla selezione`,'ok');
+    }catch(err){ log('Copia non riuscita: '+err.message,'warn'); }
+  }
+  async function pasteFromClipboardAt(startTd){
+    let txt='';
+    try{ if(navigator.clipboard?.readText) txt = await navigator.clipboard.readText(); }catch(e){}
+    if(!txt){
+      const manual = prompt('Incolla qui il contenuto, poi premi OK:','');
+      if(manual==null) return;
+      txt = manual;
+    }
+    const payload = gridFromText(txt);
+    pasteGridAt(startTd, payload.grid);
+  }
+  function pasteGridAt(startTd, grid){
+    if(!startTd) return;
+    const table = document.getElementById('calendar');
+    const startR = startTd.closest('tr').rowIndex;
+    const startC = startTd.cellIndex;
+
+    if(state.selected.size>1 && grid.length===1 && grid[0].length===1){
+      const v = grid[0][0];
+      state.selected.forEach(td => writeCell(td, v));
+      log(`Incollato valore in ${state.selected.size} celle`,'ok');
+      if(state.search.q) buildSearchHits(state.search.q);
+      return;
+    }
+
+    let count=0;
+    for(let r=0; r<grid.length; r++){
+      const row = table.rows[startR + r]; if(!row) break;
+      for(let c=0; c<grid[r].length; c++){
+        const td = row.cells[startC + c]; if(!td || !td.classList.contains('cell')) break;
+        writeCell(td, grid[r][c]); count++;
+      }
+    }
+    log(`Incollato blocco ${grid.length}×${grid[0].length} (celle aggiornate: ${count})`,'ok');
+    if(state.search.q) buildSearchHits(state.search.q);
+  }
+
+  document.addEventListener('copy', (e)=>{
+    const active = document.activeElement;
+    if(active && active.tagName==='INPUT' && active.closest('.cell.editing')) return;
+    if(state.selected.size===0) return;
+    const {grid} = gridFromSelection();
+    const text = textFromGrid(grid);
+    try{
+      e.clipboardData.setData('text/plain', text);
+      e.preventDefault();
+      state.clipboard = {grid, w:grid[0]?.length||1, h:grid.length, text};
+      log(`Copiato ${state.clipboard.h}×${state.clipboard.w} dalla selezione`,'ok');
+    }catch(err){ log('Copia non riuscita: '+err.message,'warn'); }
+  });
+
+  
+// Chiudi l'editing quando si clicca altrove
+document.addEventListener('mousedown', (e)=>{
+  if(!e.target.closest('.cell.editing')){
+    closeAllEditingExcept(null);
+  }
+}, true);
+document.addEventListener('keydown', (e)=>{
+    const active = document.activeElement;
+    const isFormEl = active && (active.tagName==='INPUT' || active.tagName==='TEXTAREA' || active.isContentEditable);
+    const inCellEditing = isFormEl && active.closest('.cell.editing');
+    if(isFormEl && !inCellEditing){ return; }
+    const inEditing = active && active.tagName==='INPUT' && active.closest('.cell.editing');
+
+    // COPY
+    if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='c'){
+      if(inEditing && state.selected.size<=1) return;
+      e.preventDefault();
+      copySelectionToClipboard();
+      return;
+    }
+
+    // PASTE
+    if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='v'){
+      if(inEditing && state.selected.size<=1) return;
+      e.preventDefault();
+      const b = selectionBounds();
+      let startTd = null;
+      if(b){
+        const table = document.getElementById('calendar');
+        startTd = table.rows[b.minR].cells[b.minC];
+      }else if(state.anchorCell){ startTd = state.anchorCell; }
+      else { log('Seleziona una cella dove incollare.','warn'); return; }
+      pasteFromClipboardAt(startTd);
+      return;
+    }
+
+    // DELETE / BACKSPACE
+    if((e.key==='Delete' || e.key==='Backspace') && !inEditing){
+      if(state.selected.size){
+        e.preventDefault();
+        state.selected.forEach(td=> writeCell(td, ''));
+        log(`Cancellate ${state.selected.size} celle`,'ok');
+        if(state.search.q) buildSearchHits(state.search.q);
+      }
+    }
+    // START EDITING
+    if(!inEditing && !isFormEl){
+      const td = state.anchorCell || (state.selected.size ? Array.from(state.selected)[0] : null);
+      if(td && td.classList.contains('cell')){
+        const key = e.key;
+        const isPrintable = key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
+        const isF2 = key === 'F2';
+        if(isPrintable || isF2){
+          e.preventDefault();
+          enterEdit(td);
+          const input = td.querySelector('input');
+          if(isPrintable && input){
+            input.value = key;
+            try{ input.setSelectionRange(input.value.length, input.value.length); }catch(_){}
+          }
+          return;
+        }
+      }
+    }
+
+    // Close context menu on ESC
+    if(e.key === 'Escape'){ hideCtx(); }
+  });
+
+  document.addEventListener('paste', (e)=>{
+    const active = document.activeElement;
+    const isFormEl = active && (active.tagName==='INPUT' || active.tagName==='TEXTAREA' || active.isContentEditable);
+    const inCellEditing = isFormEl && active.closest('.cell.editing');
+    if(isFormEl && !inCellEditing){ return; }
+    const inEditing = active && active.tagName==='INPUT' && active.closest('.cell.editing');
+    const multiSel = state.selected.size>1;
+    if(inEditing && !multiSel){
+      return;
+    }
+    e.preventDefault();
+    const txt = e.clipboardData.getData('text/plain') || '';
+    if(!txt){ log('Niente da incollare.','warn'); return; }
+
+    const payload = gridFromText(txt);
+    const b = selectionBounds();
+    let startTd = null;
+    if(b){
+      const table = document.getElementById('calendar');
+      startTd = table.rows[b.minR].cells[b.minC];
+    }else if(state.anchorCell){ startTd = state.anchorCell; }
+    else { log('Seleziona una cella dove incollare.','warn'); return; }
+    pasteGridAt(startTd, payload.grid);
+  });
+
+  /* ======== CONTEXT MENU ======== */
+  const ctx = document.getElementById('ctx');
+  function showCtx(x,y){ ctx.style.left=x+'px'; ctx.style.top=y+'px'; ctx.style.display='block'; ctx.setAttribute('aria-hidden','false'); ctx.querySelector('.itm')?.focus(); }
+  function hideCtx(){ ctx.style.display='none'; ctx.setAttribute('aria-hidden','true'); state.ctxTarget=null; }
+
+  document.addEventListener('contextmenu', (e)=>{
+    const inInput = e.target.closest?.('.cell.editing input');
+    if(inInput){ return; }
+    const td = e.target.closest?.('td.cell');
+    if(!td){ hideCtx(); return; }
+    e.preventDefault();
+    if(!state.selected.size || !state.selected.has(td)){
+      clearSelection(); addToSelection(td);
+    }
+    state.ctxTarget = td;
+    const rect = document.body.getBoundingClientRect();
+    const px = Math.min(e.clientX, rect.width - 200);
+    const py = Math.min(e.clientY, rect.height - 10);
+    showCtx(px,py);
+  });
+
+  document.addEventListener('click', (e)=>{ if(!e.target.closest('#ctx')) hideCtx(); });
+  document.addEventListener('scroll', hideCtx, true);
+  window.addEventListener('blur', hideCtx);
+  ctx.addEventListener('keydown', (e)=>{
+    const items = Array.from(ctx.querySelectorAll('.itm'));
+    let idx = items.indexOf(document.activeElement);
+    if(e.key==='ArrowDown'){ e.preventDefault(); items[(idx+1+items.length)%items.length]?.focus(); }
+    if(e.key==='ArrowUp'){ e.preventDefault(); items[(idx-1+items.length)%items.length]?.focus(); }
+    if(e.key==='Escape'){ e.preventDefault(); hideCtx(); }
+    if(e.key==='Enter' || e.key===' '){ e.preventDefault(); document.activeElement?.click(); }
+  });
+
+  ctx.addEventListener('click', async (e)=>{
+    const it = e.target.closest('.itm'); if(!it) return;
+    const cmd = it.dataset.cmd;
+    hideCtx();
+    if(cmd==='copy'){ copySelectionToClipboard(); }
+    else if(cmd==='paste'){
+      const startTd = state.ctxTarget || state.anchorCell;
+      if(!startTd){ log('Seleziona una cella dove incollare.','warn'); return; }
+      await pasteFromClipboardAt(startTd);
+    }
+    else if(cmd==='clear'){
+      if(state.selected.size){
+        state.selected.forEach(td => writeCell(td, ''));
+        if(state.search.q) buildSearchHits(state.search.q);
+        log('Celle cancellate.','cell'); saveNow();
+      }else if(state.ctxTarget){
+        writeCell(state.ctxTarget,''); if(state.search.q) buildSearchHits(state.search.q);
+      }
+    }
+  });
+
+  /* ======== SEARCH ======== */
+  const qEl = document.getElementById('search-q');
+  const prevBtn = document.getElementById('search-prev');
+  const nextBtn = document.getElementById('search-next');
+  const countEl = document.getElementById('search-count');
+  function updateSearchCount(){
+    const n = state.search.hits.length, i = state.search.idx>=0 ? (state.search.idx+1) : 0;
+    countEl.textContent = `${i}/${n}`;
+  }
+  function clearSearchHighlights(){
+    document.querySelectorAll('.cell.search-hit').forEach(el=>el.classList.remove('search-hit'));
+  }
+  function buildSearchHits(qRaw){
+    const q=(qRaw||'').trim().toLowerCase();
+    state.search.q=q; state.search.hits=[]; state.search.idx=-1;
+    clearSearchHighlights();
+    if(!q){ updateSearchCount(); return; }
+
+    const rawHits=[];
+    for(const [k,v] of state.selections.entries()){
+      const text=(v||'').toLowerCase();
+      if(text.includes(q)){
+        const [dateStr,name=''] = k.split(',');
+        const [dd,mm,yy] = dateStr.split('-').map(n=>parseInt(n,10));
+        const ymd = yy*10000 + mm*100 + dd;
+        rawHits.push({ key:k, month:mm, dateStr, name, ymd });
+      }
+    }
+    if(!rawHits.length){ updateSearchCount(); return; }
+
+    rawHits.sort((a,b)=> a.ymd - b.ymd || a.name.localeCompare(b.name));
+
+    const now = new Date();
+    const anchorYMD = state.year*10000 + (now.getMonth()+1)*100 + now.getDate();
+
+    let startIdx = rawHits.findIndex(h => h.ymd > anchorYMD);
+    if(startIdx === -1) startIdx = 0;
+
+    state.search.hits = rawHits.map(h=>({key:h.key, month:h.month, dateStr:h.dateStr, name:h.name, ymd:h.ymd}));
+    state.search.idx = (startIdx - 1 + state.search.hits.length) % state.search.hits.length;
+
+    updateSearchCount();
+  }
+  function gotoSearch(dir){
+    const H=state.search.hits; if(!H.length){ return; }
+    state.search.idx = ( (state.search.idx + dir) % H.length + H.length ) % H.length;
+    const hit = H[state.search.idx];
+
+    if(state.stackTop==null){ renderStack(hit.month); }
+    else{
+      let guard=0;
+      while(hit.month < state.stackTop && guard++<24){ ensurePrevMonth(); }
+      while(hit.month > state.stackBottom && guard++<24){ ensureNextMonth(); }
+    }
+
+    const td=document.querySelector('td.cell[data-key="'+cssEscape(hit.key)+'"]');
+    if(td){
+      document.querySelectorAll('.cell.search-hit').forEach(el=>el.classList.remove('search-hit'));
+      td.classList.add('search-hit');
+      const c=document.getElementById('month');
+      const tr=td.closest('tr');
+      const head=document.querySelector('#thead');
+      const headH = head ? Math.round(head.getBoundingClientRect().height) : 0;
+      const target = tr ? (tr.offsetTop - headH) : 0;
+      c.scrollTo({top: Math.max(0, target), behavior:'smooth'});
+      clearSelection(); addToSelection(td);
+      updateSearchCount();
+    }else{
+      log('Risultato non visibile, riprovo…','warn');
+      setTimeout(()=>gotoSearch(0),50);
+    }
+  }
+
+  // Espongo importer selections per year_single_selector.js
+  window.importSelectionsFromText = importSelectionsFromText;
+  qEl.addEventListener('input', ()=> buildSearchHits(qEl.value));
+  qEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); gotoSearch(+1); } });
+  prevBtn.addEventListener('click', ()=> gotoSearch(-1));
+  nextBtn.addEventListener('click', ()=> gotoSearch(+1));
+
+  /* ------- Autoload ------- */
+  async function autoLoad(){
+    log('Autoload…','info');
+    if(location.protocol==='file:') log('Aperto via file:// – usa il server Flask per salvataggi automatici.','warn');
+
+    try{
+      const cfg=await getTextFromServer('config.ini') || await fetchText('config.ini');
+      if(cfg){
+        const ini=parseIni(cfg);
+        if(ini['Anno']?.['year']) $('#year').value=ini['Anno']['year'];
+        if(ini['Team']?.['names']) $('#names').value=ini['Team']['names'];
+        if(ini['Linac']?.['options']) $('#options').value=ini['Linac']['options'];
+      }
+      if(!$('#year').value){
+        const cfgTxt = await getTextFromServer('config.txt') || await fetchText('config.txt');
+        if(cfgTxt){
+          const y = parseYearFromConfigTxt(cfgTxt);
+          if(y){ $('#year').value = y; log('Anno letto da config.txt: '+y,'ok'); }
+        }
+      }
+      state.year=parseInt($('#year').value || (new Date().getFullYear()+1),10);
+      state.names=($('#names').value||'').split(',').map(s=>s.trim()).filter(Boolean);
+      state.options=($('#options').value||'').split(',').map(s=>s.trim()).filter(Boolean);
+      const dl=$('#options-list'); dl.innerHTML=''; state.options.forEach(v=>{ const o=document.createElement('option'); o.value=v.trim(); dl.appendChild(o); });
+
+      await loadHolidaysFromLocalOrWeb();
+
+      const selName = selectionsFileName();
+      const selTxt = await getTextFromServer(selName) || await fetchText(selName);
+      if(selTxt){ importSelectionsFromText(selTxt); log('Caricato '+selName,'ok'); }
+      else {
+        let ls=''; try{ ls = localStorage.getItem('selections_'+state.year) || ''; }catch(_){ ls=''; }
+        if(ls){ importSelectionsFromText(ls); log('Selections caricati da backup locale (localStorage).','ok'); }
+        else { log('Nessun selections trovato: userò '+selName+' per i salvataggi.','warn'); }
+      }
+
+      save.selName = selName;
+      save.logName = 'planny_log_'+state.year+'.txt';
+
+      try { await appendLogsToServer({force:true}); } catch(e){ log('Impossibile creare/aggiornare il log: '+e.message,'warn'); }
+
+      renderAndJumpToToday();
+
+      await exportXLSXServerSave();
+    }catch(e){
+      log('Errore in autoload: '+e.message,'err');
+    }
+  }
+
+  // Espongo importer selections per year_single_selector.js
+  window.importSelectionsFromText = importSelectionsFromText;
+
+  document.getElementById('jump-today').addEventListener('click', jumpToToday);
+
+  // init
+  autoLoad();
+
+  // Ascolto eventi dal selettore anno esterno
+  try{
+    document.addEventListener('planner:reload', reconfigureAfterYearChange);
+    window.addEventListener('planner:year-changed', reconfigureAfterYearChange);
+  }catch(_){}
+
+})();</script>
+
+<script>
+// Carica year_single_selector.js, fallback a year_single_selector.fixed.js
+(function(){
+  function loadExternal(list){
+    if(!list.length) return;
+    var s=document.createElement('script');
+    s.src=list[0]; s.defer=true;
+    s.onerror=function(){ loadExternal(list.slice(1)); };
+    document.body.appendChild(s);
+  }
+  loadExternal(['year_single_selector.js','year_single_selector.fixed.js']);
+})();
+</script>
+
+
+<!-- ==== Planny Cloud Year Selector + Cloud Adapter (non-invasivo) ==== -->
+<style>
+  #cloud-year-box{display:flex;gap:6px;align-items:center;margin:6px 8px}
+  #cloud-year-box label{opacity:.8;font-size:12px}
+  #cloud-year-box select{padding:4px 8px;border-radius:6px;border:1px solid #c8ced8}
+  #cloud-year-badge{font:12px monospace;opacity:.7}
+</style>
+<script>
+(function(){
+  const API = '/api/files/';
+  const CFG = ['config.ini','config.txt'];
+  const bust = () => '?ts=' + Date.now();
+  const fname = y => `selections_${String(y).trim()}.txt`;
+
+  async function apiGet(n){
+    const r = await fetch(API + encodeURIComponent(n) + bust(), { cache:'no-store' });
+    if (r.status === 404) return null;
+    if (!r.ok) throw new Error('GET '+n+' → '+r.status);
+    return await r.text();
+  }
+  async function apiPut(n, txt){
+    const r = await fetch(API + encodeURIComponent(n), { method:'PUT', body: txt ?? '' });
+    if (!r.ok) throw new Error('PUT '+n+' → '+r.status);
+    try { return await r.json(); } catch { return { ok:true }; }
+  }
+
+  window.Cloud = {
+    async readSelections(year){ const t = await apiGet(fname(year)); return t ?? ''; },
+    async saveSelections(year, text){ return await apiPut(fname(year), text || ''); },
+    async readConfig(){
+      for (const n of CFG){ const t = await apiGet(n); if (t!==null) return {name:n,text:t}; }
+      return { name: CFG[0], text: '' };
+    },
+    async saveConfig(text, name){
+      const n = name || (window.Cloud && window.Cloud._lastCfgName) || CFG[0];
+      window.Cloud._lastCfgName = n;
+      return await apiPut(n, text || '');
+    }
+  };
+
+  function parseIniYears(txt){
+    const m = (txt||'').match(/^\s*anni\s*=\s*([0-9,\s]+)\s*$/im);
+    if(!m) return null;
+    return m[1].split(',').map(s=>s.trim()).filter(Boolean).map(Number);
+  }
+
+  function installYearSelector(years){
+    if (document.getElementById('cloud-year-select')) return;
+    let host = document.querySelector('#toolbar, .toolbar, header, .topbar, .controls');
+    if (!host) host = document.body.firstElementChild || document.body;
+
+    const box = document.createElement('div');
+    box.id = 'cloud-year-box';
+    const label = document.createElement('label');
+    label.textContent = 'Anno';
+    label.htmlFor = 'cloud-year-select';
+    const sel = document.createElement('select');
+    sel.id = 'cloud-year-select';
+    const badge = document.createElement('span');
+    badge.id = 'cloud-year-badge';
+    badge.style.marginLeft = '6px';
+
+    box.appendChild(label); box.appendChild(sel); box.appendChild(badge);
+    host.insertBefore(box, host.firstChild);
+
+    const now = new Date().getFullYear();
+    const list = (years && years.length ? years : [now-1, now, now+1, now+2]);
+    sel.innerHTML = list.map(y=>`<option value="${y}">${y}</option>`).join('');
+
+    const saved = localStorage.getItem('plannyYear');
+    const target = (saved && list.includes(+saved)) ? +saved :
+                   (window.state && window.state.year && list.includes(+window.state.year) ? +window.state.year : now);
+    sel.value = String(target);
+    localStorage.setItem('plannyYear', sel.value);
+    window.state = window.state || {}; window.state.year = +sel.value;
+    badge.textContent = fname(sel.value);
+
+    sel.addEventListener('change', async () => {
+      window.state.year = +sel.value;
+      localStorage.setItem('plannyYear', sel.value);
+      badge.textContent = fname(sel.value);
+      await reloadSelectionsFromCloud();
     });
   }
 
-  // NON leggiamo la lista dal server: usiamo anno corrente e anno successivo
-  function listYearsFixed() {
-    const now = new Date().getFullYear();
-    return [now, now + 1];
-  }
-
-  async function getSelectionsYear(year) {
-    // 1) text/plain
-    const r1 = await origFetch('/api/files/' + encodeURIComponent(`selections_${year}.txt`) + '?' + Date.now(), { cache:'no-store' });
-    if (r1.ok) return { ok:true, year, text: await r1.text() };
-
-    // 2) JSON fallback
-    const r2 = await origFetch('/api/files/text/' + encodeURIComponent(`selections_${year}.txt`) + '?' + Date.now(), { cache:'no-store' });
-    if (!r2.ok) return { ok:false, year, text:'' };
-    const j = await r2.json().catch(()=>({ ok:false }));
-    if (j && j.ok) return { ok:true, year, text:j.text || '' };
-    return { ok:false, year, text:'' };
-  }
-
-  // Intercetta solo gli endpoint che usa il selettore
-  window.fetch = async function (input, init) {
-    const url = (typeof input === 'string') ? input : (input?.url || '');
-    try {
-      if (/\/api\/years(?:\?|$)/.test(url)) {
-        return jsonResponse({ ok:true, years: listYearsFixed() });
-      }
-      const m = /\/api\/selections\/(\d{4})(?:\?|$)/.exec(url);
-      if (m) {
-        const yr = +m[1];
-        const payload = await getSelectionsYear(yr);
-        return jsonResponse(payload, payload.ok ? 200 : 404);
-      }
-    } catch {}
-    return origFetch(input, init);
+  window.saveSelectionsToCloud = async function(){
+    const y = window.state?.year || new Date().getFullYear();
+    let text = '';
+    try{ if (typeof window.selectionsToText === 'function') text = window.selectionsToText(); }catch{}
+    await window.Cloud.saveSelections(y, text);
+    console.log('[Cloud] Salvato selections_'+y+'.txt');
   };
+
+  window.reloadSelectionsFromCloud = async function(){
+    const y = window.state?.year || new Date().getFullYear();
+    const txt = await window.Cloud.readSelections(y);
+    if (typeof window.importSelectionsFromText === 'function') window.importSelectionsFromText(txt || '');
+    if (typeof window.renderCalendar === 'function') window.renderCalendar();
+    console.log('[Cloud] Ricaricato selections_'+y+'.txt');
+  };
+
+  async function boot(){
+    window.state = window.state || {};
+    if (!window.state.year) {
+      const saved = localStorage.getItem('plannyYear');
+      window.state.year = saved ? +saved : (new Date().getFullYear());
+    }
+    let yearsFromCfg = null;
+    try{
+      const {name,text} = await window.Cloud.readConfig();
+      window.Cloud._lastCfgName = name;
+      if (typeof window.applyConfigFromText === 'function') { try{ window.applyConfigFromText(text); }catch{} }
+      yearsFromCfg = parseIniYears(text);
+    }catch{}
+
+    installYearSelector(yearsFromCfg);
+
+    try{
+      const txt = await window.Cloud.readSelections(window.state.year);
+      if (typeof window.importSelectionsFromText === 'function') window.importSelectionsFromText(txt || '');
+      if (typeof window.renderCalendar === 'function') window.renderCalendar();
+    }catch(e){ console.warn('Cloud bootstrap error:', e); }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
 })();
 </script>
-<!-- ⬆️ FINE BLOCCO AGGIUNTO -->
+<!-- ==== /Year Selector + Cloud Adapter ==== -->
+</body>
+</html>
