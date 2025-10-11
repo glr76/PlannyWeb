@@ -78,30 +78,58 @@
 </main>
 
 <!-- ===================================================== -->
-<!-- 1️⃣ ADAPTER: collega year_single_selector.js al planner -->
+<!-- 1️⃣ ADAPTER ROBUSTO: collega year_single_selector.js al planner -->
 <!-- ===================================================== -->
 <script>
   // Nomi che year_single_selector.js si aspetta
   window.__SINGLE_IMPORTER = "plannyImporter";
   window.__SINGLE_RENDERER = "plannyRenderer";
 
-  // Inoltra alle funzioni reali del planner
+  // Funzione import robusta
   function plannyImporter(text) {
-    if (typeof window.importSelectionsFromText === 'function') {
-      return window.importSelectionsFromText(text);
+    const candidati = [
+      'importSelectionsFromText',
+      'importSelections',
+      'plannyImport',
+      'applySelections',
+      'loadSelections',
+      'plannerImport',
+      'fromText',
+      'importer',
+    ];
+    for (const name of candidati) {
+      const fn = window[name];
+      if (typeof fn === 'function' && fn !== plannyImporter) {
+        console.info('[Importer] uso', name);
+        return fn.call(window, text);
+      }
     }
-    if (typeof window.importSelections === 'function') {
-      return window.importSelections(text);
+    if (typeof window.__CUSTOM_IMPORTER__ === 'function') {
+      console.info('[Importer] uso __CUSTOM_IMPORTER__');
+      return window.__CUSTOM_IMPORTER__(text);
     }
     console.warn('[Importer] Manca importSelectionsFromText (o alias).');
   }
 
+  // Funzione render robusta
   function plannyRenderer() {
-    if (typeof window.renderCalendar === 'function') {
-      return window.renderCalendar();
+    const candidati = [
+      'renderCalendar',
+      'render',
+      'drawCalendar',
+      'buildCalendar',
+      'plannerRender',
+    ];
+    for (const name of candidati) {
+      const fn = window[name];
+      if (typeof fn === 'function' && fn !== plannyRenderer) {
+        console.info('[Renderer] uso', name);
+        return fn.call(window);
+      }
     }
-    if (typeof window.render === 'function') {
-      return window.render();
+    if (typeof window.__CUSTOM_RENDERER__ === 'function') {
+      console.info('[Renderer] uso __CUSTOM_RENDERER__');
+      return window.__CUSTOM_RENDERER__();
     }
     console.warn('[Renderer] Manca renderCalendar (o alias).');
   }
@@ -171,7 +199,7 @@
 </script>
 
 <!-- ================================================= -->
-<!-- 3️⃣ SELETTORE ANNO - caricato dopo l'adapter/shim -->
+<!-- 3️⃣ SELETTORE ANNO - caricato dopo adapter/shim -->
 <!-- ================================================= -->
 <script src="year_single_selector.js"></script>
 
@@ -232,7 +260,7 @@
 </script>
 
 <!-- ================================================= -->
-<!-- 5️⃣ Rimozione totale export Excel/download -->
+<!-- 5️⃣ Rimozione export Excel / download manuali -->
 <!-- ================================================= -->
 <script>
   async function exportXLSXServerSave(){ return { ok:true, skipped:true }; }
