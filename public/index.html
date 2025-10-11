@@ -1,270 +1,179 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="it">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Planny (HTML)</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body {
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-      margin: 0;
-      background: #f8f9fb;
-      color: #222;
+    :root{
+      --bg:#f5f7fb; --panel:#ffffff; --surface:#eef2f7; --border:#dfe5ef;
+      --text:#0f1720; --muted:#5b6877;
+      --ok:#16a34a; --warn:#d97706; --err:#dc2626;
     }
-    header {
-      position: sticky;
-      top: 0;
-      background: #fff;
-      border-bottom: 1px solid #ddd;
-      z-index: 10;
-    }
-    .topbar {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 10px 16px;
-    }
-    h1 {
-      font-size: 18px;
-      margin: 0;
-    }
-    #save-indicator {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12px;
-      color: #555;
-    }
-    #save-indicator .dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      display: inline-block;
-      background: #ccc;
-    }
-    #save-indicator .dot.ok { background: #16a34a; }
-    #save-indicator .dot.dirty { background: #dc2626; }
-    #save-indicator .dot.wait { background: #f59e0b; animation: pulse 1.2s infinite ease-in-out; }
-    @keyframes pulse { 0%,100% { opacity:.6 } 50% { opacity:1 } }
-
-    main { padding: 20px; }
-    #terminal {
-      width: 100%;
-      height: 150px;
-      font-family: ui-monospace, Menlo, Consolas, monospace;
-      font-size: 12px;
-    }
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu}
+    .wrap{max-width:1280px;margin:0 auto;padding:12px}
+    h1{margin:0 0 10px;font-size:18px;display:flex;align-items:center;gap:10px}
+    .badge{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:999px;background:#fff;border:1px solid var(--border);font-size:12px}
+    .dot{width:8px;height:8px;border-radius:50%}
+    .dot.ok{background:var(--ok)} .dot.warn{background:var(--warn)} .dot.err{background:var(--err)}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:10px}
+    #terminal{background:#0b0b0b;border:1px solid #1f2937;border-radius:12px;color:#c7d1db;height:200px;overflow:auto;padding:8px;font:12px ui-monospace,Consolas,monospace}
+    .ln{white-space:pre-wrap;margin:2px 0}
+    .ln.info{color:#9bb0c9} .ln.ok{color:#16a34a} .ln.warn{color:#f59e0b} .ln.err{color:#ef4444}
+    /* barra year_single_selector.js sarà iniettata sticky subito dopo <h1> */
+    #yearBarSingle{position:sticky;top:0;z-index:50}
   </style>
 </head>
 <body>
+  <div class="wrap">
+    <h1>
+      Planny (HTML)
+      <span id="saveBadge" class="badge" title="Stato salvataggio">
+        <span id="saveDot" class="dot ok"></span>
+        <span id="saveText">salvato</span>
+      </span>
+    </h1>
 
-<header>
-  <div class="topbar">
-    <h1>Planny (HTML)</h1>
-    <div id="save-indicator">
-      <span class="dot ok"></span>
-      <span class="label">salvato</span>
+    <!-- QUI SOTTO resta/va il TUO calendario originale -->
+    <div id="app" class="card" style="margin-bottom:10px">
+      <!-- Mantieni il tuo markup del planner.
+           Se il tuo calendario viene costruito da JS, lascia pure vuoto: verrà disegnato dopo. -->
+      <div id="calendar-mount"></div>
     </div>
-    <div id="year-selector" style="margin-left:auto;"></div>
+
+    <div class="card">
+      <h3 style="margin:0 0 6px;color:#5b6877;font-size:13px">Terminale</h3>
+      <div id="terminal" aria-live="polite"></div>
+    </div>
   </div>
-</header>
 
-<main>
-  <div id="calendar-container"></div>
-  <section style="margin-top:20px;">
-    <h3>Terminale</h3>
-    <textarea id="terminal" placeholder="Log azioni..."></textarea>
-  </section>
-</main>
+  <script>
+    /************ LOG MINIMO ************/
+    const T = document.getElementById('terminal');
+    function logLn(msg, lvl='info'){
+      (lvl==='err'?console.error:lvl==='warn'?console.warn:console.log)(msg);
+      if(!T) return;
+      const d=document.createElement('div'); d.className='ln '+lvl; 
+      const ts=new Date().toLocaleTimeString();
+      d.textContent = `[${ts}] ${lvl.toUpperCase()}: ${msg}`;
+      T.appendChild(d); T.scrollTop=T.scrollHeight;
+    }
 
-<!-- ===================================================== -->
-<!-- 1️⃣ ADAPTER ROBUSTO: collega year_single_selector.js al planner -->
-<!-- ===================================================== -->
-<script>
-  // Nomi che year_single_selector.js si aspetta
-  window.__SINGLE_IMPORTER = "plannyImporter";
-  window.__SINGLE_RENDERER = "plannyRenderer";
-
-  // Funzione import robusta
-  function plannyImporter(text) {
-    const candidati = [
-      'importSelectionsFromText',
-      'importSelections',
-      'plannyImport',
-      'applySelections',
-      'loadSelections',
-      'plannerImport',
-      'fromText',
-      'importer',
-    ];
-    for (const name of candidati) {
-      const fn = window[name];
-      if (typeof fn === 'function' && fn !== plannyImporter) {
-        console.info('[Importer] uso', name);
-        return fn.call(window, text);
+    /************ SPIA SALVATAGGIO & GUARDIA UNLOAD ************/
+    const badge = document.getElementById('saveBadge');
+    const dot   = document.getElementById('saveDot');
+    const sTxt  = document.getElementById('saveText');
+    const SaveUI = {
+      set(state){ // 'ok' | 'busy' | 'err'
+        if(state==='ok'){ dot.className='dot ok'; sTxt.textContent='salvato'; }
+        else if(state==='busy'){ dot.className='dot warn'; sTxt.textContent='salvataggio…'; }
+        else { dot.className='dot err'; sTxt.textContent='errore'; }
       }
-    }
-    if (typeof window.__CUSTOM_IMPORTER__ === 'function') {
-      console.info('[Importer] uso __CUSTOM_IMPORTER__');
-      return window.__CUSTOM_IMPORTER__(text);
-    }
-    console.warn('[Importer] Manca importSelectionsFromText (o alias).');
-  }
+    };
+    // Exposed hooks per il tuo codice:
+    window.__onSaveBegin  = () => SaveUI.set('busy');
+    window.__onSaveOk     = () => SaveUI.set('ok');
+    window.__onSaveError  = () => SaveUI.set('err');
 
-  // Funzione render robusta
-  function plannyRenderer() {
-    const candidati = [
-      'renderCalendar',
-      'render',
-      'drawCalendar',
-      'buildCalendar',
-      'plannerRender',
-    ];
-    for (const name of candidati) {
-      const fn = window[name];
-      if (typeof fn === 'function' && fn !== plannyRenderer) {
-        console.info('[Renderer] uso', name);
-        return fn.call(window);
-      }
-    }
-    if (typeof window.__CUSTOM_RENDERER__ === 'function') {
-      console.info('[Renderer] uso __CUSTOM_RENDERER__');
-      return window.__CUSTOM_RENDERER__();
-    }
-    console.warn('[Renderer] Manca renderCalendar (o alias).');
-  }
-</script>
-
-<!-- ==================================================================== -->
-<!-- 2️⃣ SHIM ENDPOINT: crea risposte per /api/years e /api/selections/YYYY -->
-<!-- ==================================================================== -->
-<script>
-(function () {
-  const origFetch = window.fetch.bind(window);
-
-  function jsonResponse(obj, status = 200) {
-    return new Response(JSON.stringify(obj), {
-      status,
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Cache-Control': 'no-store, max-age=0'
+    let __saving = false, __pending = false;
+    function markSaving(b){ __saving = !!b; }
+    function markPending(b){ __pending = !!b; }
+    window.addEventListener('beforeunload', (e)=>{
+      if(__saving || __pending){
+        e.preventDefault();
+        e.returnValue = '';
       }
     });
-  }
 
-  async function listYears() {
-    try {
-      const r = await origFetch('/api/files/list', { cache: 'no-store' });
-      if (!r.ok) return [];
-      const j = await r.json().catch(() => ({}));
-      const files = Array.isArray(j.files) ? j.files : [];
-      const years = [];
-      for (const it of files) {
-        const name = it?.name || '';
-        const m = /^selections_(\d{4})\.txt$/i.exec(name);
-        if (m) years.push(+m[1]);
-      }
-      return [...new Set(years)].sort((a, b) => a - b);
-    } catch { return []; }
-  }
-
-  async function getSelectionsYear(year) {
-    const r1 = await origFetch('/api/files/' + encodeURIComponent(`selections_${year}.txt`) + '?' + Date.now(), { cache:'no-store' });
-    if (r1.ok) return { ok:true, year, text: await r1.text() };
-
-    const r2 = await origFetch('/api/files/text/' + encodeURIComponent(`selections_${year}.txt`) + '?' + Date.now(), { cache:'no-store' });
-    if (!r2.ok) return { ok:false, year, text:'' };
-    const j = await r2.json().catch(()=>({ ok:false }));
-    if (j && j.ok) return { ok:true, year, text:j.text || '' };
-    return { ok:false, year, text:'' };
-  }
-
-  window.fetch = async function (input, init) {
-    const url = (typeof input === 'string') ? input : (input?.url || '');
-    try {
-      if (/\/api\/years(?:\?|$)/.test(url)) {
-        const years = await listYears();
-        return jsonResponse({ ok: true, years });
-      }
-      const m = /\/api\/selections\/(\d{4})(?:\?|$)/.exec(url);
-      if (m) {
-        const yr = +m[1];
-        const payload = await getSelectionsYear(yr);
-        return jsonResponse(payload, payload.ok ? 200 : 404);
-      }
-    } catch {}
-    return origFetch(input, init);
-  };
-})();
-</script>
-
-<!-- ================================================= -->
-<!-- 3️⃣ SELETTORE ANNO - caricato dopo adapter/shim -->
-<!-- ================================================= -->
-<script src="year_single_selector.js"></script>
-
-<!-- ================================================= -->
-<!-- 4️⃣ PATCH: spia salvataggio e blocco refresh -->
-<!-- ================================================= -->
-<script>
-  (function(){
-    let dirty = false, saving = false, autosaveTimer = null;
-    const indicator = document.getElementById('save-indicator');
-    const dot = indicator.querySelector('.dot');
-    const label = indicator.querySelector('.label');
-    const terminal = document.getElementById('terminal');
-
-    function log(msg){
-      const t = new Date().toLocaleTimeString();
-      terminal.value += `\n[${t}] ${msg}`;
-      terminal.scrollTop = terminal.scrollHeight;
+    /************ API CLOUD BASE ************/
+    async function getTextFromServer(name){
+      const r = await fetch('/api/files/' + encodeURIComponent(name), {cache:'no-store'});
+      if(r.status===404) return null;
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return r.text();
     }
-    function updateIndicator(){
-      if(saving){ dot.className='dot wait'; label.textContent='salvataggio...'; return; }
-      if(dirty){ dot.className='dot dirty'; label.textContent='non salvato'; }
-      else { dot.className='dot ok'; label.textContent='salvato'; }
+    async function putTextToServer(name, content){
+      const r = await fetch('/api/files/' + encodeURIComponent(name), {
+        method:'PUT',
+        headers:{'Content-Type':'text/plain; charset=utf-8'},
+        body:content
+      });
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return r.json().catch(()=>({ok:true}));
     }
-    function setDirty(v){ dirty = !!v; updateIndicator(); }
-    function setSaving(v){ saving = !!v; updateIndicator(); }
 
-    window.addEventListener('beforeunload', e=>{
-      if(dirty || saving){ e.preventDefault(); e.returnValue=''; }
-    });
+    /************ IMPORTER SELECTIONS ************
+     * Mantieni questa funzione se nel tuo index era già presente;
+     * è quella che year_single_selector.js chiamerà per passarti il testo.
+     */
+    window.importSelectionsFromText = function(txt){
+      // >>> QUI resta la tua logica originale di parsing + render <<<
+      // Se già l’avevi nel vecchio file, spostala/lascia qui senza cambiare il nome.
+      // Esempio minimo di log (da rimuovere se hai già il tuo parsing):
+      const n = (txt||'').split(/\r?\n/).filter(Boolean).length;
+      logLn('Selections caricati ('+n+' righe)','ok');
 
-    const origSaveNow = window.saveNow;
-    window.saveNow = async function(){
-      setSaving(true);
-      try{
-        if(typeof origSaveNow === 'function'){ await origSaveNow(); }
-        setDirty(false);
-        log('Salvataggio completato.');
-      }catch(e){
-        log('ERRORE salvataggio: ' + e.message);
-      }
-      setSaving(false);
+      // Se il tuo calendario usa una variabile globale ‘state.year’, assicurati sia settata
+      // dal selettore anno (vedi sotto). Poi qui richiama il tuo render:
+      if(typeof renderCalendar==='function'){ try{ renderCalendar(); }catch(e){ logLn('Errore renderCalendar: '+e,'err'); } }
+      // In alternativa, il year_single_selector scatenerà anyway eventi custom che puoi intercettare.
     };
 
-    const origWriteCell = window.writeCell;
-    if(origWriteCell) {
-      window.writeCell = function(...args){
-        const r = origWriteCell.apply(this, args);
-        setDirty(true);
-        clearTimeout(autosaveTimer);
-        autosaveTimer = setTimeout(()=>window.saveNow(), 1000);
-        return r;
-      };
+    // Alias per year_single_selector.js: indica quale importer chiamare
+    window.__SINGLE_IMPORTER = "importSelectionsFromText";
+
+    /************ SALVATAGGIO SELECTIONS ************
+     * Mantieni queste due funzioni se il tuo codice salva così.
+     * Se nel tuo file originario avevi già versioni più ricche, tieni le tue e chiama i 3 hook UI.
+     */
+    function selectionsFileName(year){ return `selections_${year}.txt`; }
+
+    async function saveSelectionsText(year, text){
+      try{
+        window.__onSaveBegin(); markSaving(true);
+        await putTextToServer(selectionsFileName(year), text);
+        window.__onSaveOk(); markSaving(false);
+        logLn('Selections salvati su server: '+selectionsFileName(year),'ok');
+      }catch(e){
+        window.__onSaveError(); markSaving(false);
+        logLn('Errore salvataggio selections: '+(e.message||e),'err');
+        throw e;
+      }
     }
 
-    updateIndicator();
-  })();
-</script>
+    // Metti a disposizione un helper globale (se utile al tuo codice UI)
+    window.__saveSelectionsText = saveSelectionsText;
 
-<!-- ================================================= -->
-<!-- 5️⃣ Rimozione export Excel / download manuali -->
-<!-- ================================================= -->
-<script>
-  async function exportXLSXServerSave(){ return { ok:true, skipped:true }; }
-</script>
+    // Se vuoi proteggerti da chiusure durante salvataggi programmati:
+    window.__markPendingSave = (flag)=> markPending(!!flag);
 
+    /************ OPZIONALE: APPEND LOG CLOUD ************/
+    async function appendLog(year, lines){
+      try{
+        const name = `planny_log_${year}.txt`;
+        const prev = await getTextFromServer(name).catch(()=>null);
+        const merged = (prev||'') + (lines.endsWith('\n')?lines:(lines+'\n'));
+        await putTextToServer(name, merged);
+        logLn('Log aggiornato: '+name, 'ok');
+      }catch(e){
+        logLn('Log non aggiornato: '+(e.message||e),'warn');
+      }
+    }
+    window.__appendLog = appendLog;
+
+    /************ EVENTI COMODI ************/
+    window.addEventListener('planner:year-changed', (e)=>{
+      // Se vuoi agganciarti al cambio anno del selettore:
+      // e.detail.year contiene l'anno selezionato.
+      // Qui potresti aggiornare intestazioni UI ecc.
+    });
+
+    // Messaggio di boot
+    logLn('Autoload…','info');
+  </script>
+
+  <!-- Il selettore anno single-file (la tua versione) -->
+  <script src="year_single_selector.js"></script>
 </body>
 </html>
