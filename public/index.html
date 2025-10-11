@@ -34,7 +34,6 @@
             <span class="dot ok"></span><span class="label">salvato</span>
           </span>
         </h1>
-        <!-- Se il tuo year_single_selector.js inietta una UI, può usare questo contenitore -->
         <div id="year-selector"></div>
       </div>
     </div>
@@ -49,13 +48,13 @@
     </section>
   </main>
 
-  <!-- ADAPTER GLOBALE: definisci importer/renderer PRIMA del selettore -->
+  <!-- === ADAPTER GLOBALE per il selettore === -->
   <script>
-    // Indica al selettore i nomi delle funzioni globali da invocare
+    // Indica a year_single_selector.js i nomi delle funzioni da usare
     window.__SINGLE_IMPORTER = "plannyImporter";
     window.__SINGLE_RENDERER = "plannyRenderer";
 
-    // Adapter che inoltra alle tue funzioni reali se esistono
+    // Adapter: inoltra alle tue funzioni reali
     function plannyImporter(text) {
       if (typeof window.importSelectionsFromText === 'function') {
         return window.importSelectionsFromText(text);
@@ -63,8 +62,9 @@
       if (typeof window.importSelections === 'function') {
         return window.importSelections(text);
       }
-      console.warn('[Importer] Nessuna funzione reale trovata (importSelectionsFromText/importSelections).');
+      console.warn('[Importer] Nessuna funzione trovata per importare selections.');
     }
+
     function plannyRenderer() {
       if (typeof window.renderCalendar === 'function') {
         return window.renderCalendar();
@@ -72,18 +72,17 @@
       if (typeof window.render === 'function') {
         return window.render();
       }
-      console.warn('[Renderer] Nessuna funzione di render trovata (renderCalendar/render).');
+      console.warn('[Renderer] Nessuna funzione trovata per renderizzare il calendario.');
     }
   </script>
 
-  <!-- Il tuo script che gestisce la scelta dell'anno -->
+  <!-- Selettore dell’anno -->
   <script src="year_single_selector.js"></script>
 
-  <!-- SHIM FETCH: fornisce /api/years e /api/selections/<anno> come si aspetta il selettore -->
+  <!-- === SHIM FETCH: /api/years e /api/selections/<anno> === -->
   <script>
   (function(){
     const origFetch = window.fetch.bind(window);
-
     function jsonResponse(obj, status=200){
       return new Response(JSON.stringify(obj), {
         status,
@@ -91,64 +90,56 @@
       });
     }
 
-    async function listYearsFromBucket(){
+    async function listYears(){
       try{
         const r = await origFetch('/api/files/list', { cache:'no-store' });
         if (!r.ok) return [];
         const j = await r.json().catch(()=>({}));
-        const files = Array.isArray(j.files) ? j.files : [];
+        const files = Array.isArray(j.files)?j.files:[];
         const years = [];
         for (const it of files){
-          const name = (it && it.name) ? String(it.name) : '';
+          const name = it?.name || '';
           const m = /^selections_(\d{4})\.txt$/i.exec(name);
           if (m) years.push(+m[1]);
         }
-        return Array.from(new Set(years)).sort((a,b)=>a-b);
-      }catch(_){ return []; }
+        return [...new Set(years)].sort((a,b)=>a-b);
+      }catch{ return []; }
     }
 
     async function getSelectionsYear(year){
-      // 1) prova legacy (meno rumorosa se il JSON dà 500)
-      const rLegacy = await origFetch('/api/files/' + encodeURIComponent(`selections_${year}.txt`) + '?' + Date.now(), { cache:'no-store' });
-      if (rLegacy.ok) {
-        const text = await rLegacy.text();
-        return { ok:true, year, text };
-      }
-      // 2) fallback JSON
-      const url = '/api/files/text/' + encodeURIComponent(`selections_${year}.txt`) + '?' + Date.now();
-      const r = await origFetch(url, { cache:'no-store' });
-      if (!r.ok) return { ok:false, year, text:'' };
-      const j = await r.json().catch(()=>({ok:false, text:''}));
-      if (j && j.ok) return { ok:true, year, text: j.text || '' };
+      const r1 = await origFetch('/api/files/' + encodeURIComponent(`selections_${year}.txt`) + '?' + Date.now(), { cache:'no-store' });
+      if (r1.ok) return { ok:true, year, text: await r1.text() };
+      const r2 = await origFetch('/api/files/text/' + encodeURIComponent(`selections_${year}.txt`) + '?' + Date.now(), { cache:'no-store' });
+      if (!r2.ok) return { ok:false, year, text:'' };
+      const j = await r2.json().catch(()=>({ok:false}));
+      if (j && j.ok) return { ok:true, year, text:j.text || '' };
       return { ok:false, year, text:'' };
     }
 
     window.fetch = async function(input, init){
+      const url = (typeof input==='string')?input:(input?.url||'');
       try{
-        const url = (typeof input === 'string') ? input : (input && input.url ? input.url : '');
-        if (/\/api\/years(?:\?|$)/.test(url)){
-          const years = await listYearsFromBucket();
+        if (/\/api\/years/.test(url)){
+          const years = await listYears();
           return jsonResponse({ ok:true, years });
         }
-        const m = /\/api\/selections\/(\d{4})(?:\?|$)/.exec(url);
+        const m = /\/api\/selections\/(\d{4})/.exec(url);
         if (m){
           const yr = +m[1];
           const payload = await getSelectionsYear(yr);
-          return jsonResponse(payload, payload.ok ? 200 : 404);
+          return jsonResponse(payload, payload.ok?200:404);
         }
-      }catch(_){ }
+      }catch{}
       return origFetch(input, init);
     };
   })();
   </script>
 
-  <!-- I/O CLOUD standard: prima legacy, poi JSON; niente download -->
+  <!-- === FUNZIONI CLOUD: lettura/scrittura su Supabase === -->
   <script>
   async function getTextFromServer(name){
-    // 1) legacy text
     const r1 = await fetch('/api/files/' + encodeURIComponent(name) + '?' + Date.now(), { cache:'no-store' });
     if (r1.ok) return await r1.text();
-    // 2) JSON
     const r2 = await fetch('/api/files/text/' + encodeURIComponent(name) + '?' + Date.now(), { cache:'no-store' });
     if (r2.ok){
       const j = await r2.json().catch(()=>({ok:false}));
@@ -168,119 +159,72 @@
     return j;
   }
 
-  // Evita qualunque link diretto ai .txt/.ini (niente download)
-  (function(){
-    const KEY_RX = /(^|\/)(config\.ini|config\.txt|selections_\d{4}\.txt|festivi_\d{4}\.txt)$/i;
-    document.addEventListener('click', function(ev){
-      const a = ev.target.closest && ev.target.closest('a[href]');
-      if(!a) return;
-      const href = a.getAttribute('href') || '';
-      if (KEY_RX.test(href)) { ev.preventDefault(); ev.stopPropagation(); return false; }
-    }, true);
-  })();
+  // Blocca download accidentali dei .txt/.ini
+  document.addEventListener('click', ev=>{
+    const a = ev.target.closest?.('a[href]');
+    if (!a) return;
+    const href = a.getAttribute('href')||'';
+    if (/(config|selections|festivi)_\d{4}\.txt$/i.test(href)){ ev.preventDefault(); ev.stopPropagation(); }
+  },true);
   </script>
 
-  <!-- Spia + blocco refresh se non salvato + integrazione autosave -->
+  <!-- === SPIA SALVATAGGIO + BLOCCO REFRESH === -->
   <script>
   (function(){
-    let __dirty=false, __saving=false, __saveTimer=null;
+    let dirty=false, saving=false, timer=null;
 
-    function log(msg, level){
-      const t = document.getElementById('terminal');
-      if (!t) return;
-      const tag = level==='warn' ? '[WARN] ' : level==='err' ? '[ERR] ' : '';
-      t.value += '\n' + tag + msg;
-      t.scrollTop = t.scrollHeight;
+    const indicator=document.getElementById('save-indicator');
+    const dot=indicator.querySelector('.dot'), label=indicator.querySelector('.label');
+    function refresh(){
+      if(saving){dot.className='dot wait';label.textContent='salvataggio…';return;}
+      if(dirty){dot.className='dot dirty';label.textContent='non salvato';}
+      else{dot.className='dot ok';label.textContent='salvato';}
     }
+    function setDirty(v){dirty=v;refresh();}
+    function setSaving(v){saving=v;refresh();}
 
-    function updateSaveIndicator(){
-      const el=document.getElementById('save-indicator'); if(!el) return;
-      const dot=el.querySelector('.dot'), lab=el.querySelector('.label');
-      if(__saving){ dot.className='dot wait'; lab.textContent='salvataggio…'; return; }
-      if(__dirty){ dot.className='dot dirty'; lab.textContent='non salvato'; }
-      else{ dot.className='dot ok'; lab.textContent='salvato'; }
-    }
-    function setDirty(v){ __dirty=!!v; updateSaveIndicator(); }
-    function setSaving(v){ __saving=!!v; updateSaveIndicator(); }
-
-    window.addEventListener('beforeunload",(e)=>{
-      if(__dirty || __saving){ e.preventDefault(); e.returnValue=''; return ''; }
+    window.addEventListener('beforeunload',e=>{
+      if(dirty||saving){e.preventDefault();e.returnValue='';return '';}
     });
 
-    if(typeof window.writeCell==='function'){
-      const __origWriteCell = window.writeCell;
-      window.writeCell = function(...args){
-        const ret = __origWriteCell.apply(this,args);
-        try{ setDirty(true); window.scheduleAutoSave(); }catch(_){}
-        return ret;
-      };
-    }
+    const term=document.getElementById('terminal');
+    function log(m){term.value+='\n'+m;term.scrollTop=term.scrollHeight;}
 
-    const __origSchedule = window.scheduleAutoSave;
-    window.scheduleAutoSave = function(...args){
-      setDirty(true);
-      if(typeof __origSchedule==='function'){ return __origSchedule.apply(this,args); }
-      clearTimeout(__saveTimer);
-      __saveTimer=setTimeout(()=>{ try{ window.saveNow(); }catch(_){ } }, 800);
-    };
-
-    const __origSaveNow = window.saveNow;
-    window.saveNow = async function(...args){
+    const origSaveNow=window.saveNow;
+    window.saveNow=async function(){
       setSaving(true);
       try{
-        if(typeof __origSaveNow==='function'){
-          const r = await __origSaveNow.apply(this,args);
-          setDirty(false);
-          return r;
-        }else{
-          if(typeof window.selectionsToText==='function'){
-            const y = (window.state && window.state.year) ? window.state.year : (new Date().getFullYear());
-            const name = `selections_${y}.txt`;
-            const text = window.selectionsToText();
-            await window.putTextToServer(name, text);
-          }
-          setDirty(false);
+        if(typeof origSaveNow==='function') await origSaveNow();
+        else if(typeof window.selectionsToText==='function'){
+          const y=(window.state&&window.state.year)||new Date().getFullYear();
+          await putTextToServer(`selections_${y}.txt`,window.selectionsToText());
         }
-      }catch(e){
-        log('Errore saveNow: '+(e && e.message ? e.message : e), 'warn');
-      }finally{
-        setSaving(false);
-      }
+        setDirty(false);
+      }catch(e){log('Errore salvataggio: '+e);}finally{setSaving(false);}
     };
 
-    window.__saveIndicator={ setDirty, setSaving, updateSaveIndicator };
-    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', updateSaveIndicator);
-    else updateSaveIndicator();
+    const origWrite=window.writeCell;
+    if(origWrite) window.writeCell=function(...a){const r=origWrite.apply(this,a);setDirty(true);window.scheduleAutoSave?.();return r;}
+
+    const origSched=window.scheduleAutoSave;
+    window.scheduleAutoSave=function(){setDirty(true);clearTimeout(timer);timer=setTimeout(()=>window.saveNow(),800);origSched?.();};
+
+    refresh();
   })();
   </script>
 
-  <!-- Export Excel DISATTIVATO -->
-  <script>
-    async function exportXLSXServerSave(){ return { ok:true, skipped:true }; }
-  </script>
+  <!-- Export Excel disattivato -->
+  <script>async function exportXLSXServerSave(){return{ok:true,skipped:true};}</script>
 
-  <!-- Boot “gentile”: lascia la gestione anno al selettore; fallback anno corrente -->
+  <!-- === AVVIO === -->
   <script>
   (function(){
-    async function loadAndRender(year){
-      try{
-        const txt = await window.getTextFromServer(`selections_${year}.txt`);
-        if (typeof window.plannyImporter === 'function') window.plannyImporter(txt||'');
-        if (typeof window.plannyRenderer === 'function') window.plannyRenderer();
-      }catch(e){
-        const term=document.getElementById('terminal');
-        if(term){ term.value += '\n[errore] load '+year+': '+e; term.scrollTop=term.scrollHeight; }
-      }
+    async function loadAndRender(y){
+      const t=await getTextFromServer(`selections_${y}.txt`);
+      window.plannyImporter(t||'');
+      window.plannyRenderer();
     }
-    async function boot(){
-      setTimeout(async ()=>{
-        if (!window.state || !window.state.year) {
-          const now = new Date().getFullYear();
-          await loadAndRender(now);
-        }
-      }, 800);
-    }
-    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+    setTimeout(()=>{if(!window.state?.year)loadAndRender(new Date().getFullYear());},800);
   })();
   </script>
 
