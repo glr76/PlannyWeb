@@ -84,9 +84,12 @@ def api_text_get(name: str):
     try:
         fname = _sanitize(name)
         txt = _download_text(fname)
-        if txt == "":
-            return jsonify(ok=False, name=fname, text=""), 404
-        return jsonify(ok=True, name=fname, text=txt)
+        status = 200 if txt != "" else 404
+        resp = make_response(jsonify(ok=(status==200), name=fname, text=txt), status)
+        resp.headers["Cache-Control"] = "no-store, max-age=0"
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
+        return resp
     except Exception as e:
         log.error(f"[GET json] '{name}': {e}\n{traceback.format_exc()}")
         return jsonify(ok=False, error=str(e)), 500
@@ -97,8 +100,30 @@ def api_text_put(name: str):
     try:
         fname = _sanitize(name)
         raw = request.get_data(as_text=True) or ""
+
+        # 1) scrivi
         _upload_text(fname, raw)
-        return jsonify(ok=True, name=fname, size=len(raw))
+
+        # 2) rileggi subito dal bucket (sorgente-verità)
+        echoed = _download_text(fname)
+
+        # 3) prepara risposta JSON con echo e SHA per debug
+        payload = {
+            "ok": True,
+            "name": fname,
+            "size": len(raw),
+            "echo": echoed,
+            "sha_in": sha256(raw.encode("utf-8")).hexdigest(),
+            "sha_echo": sha256((echoed or "").encode("utf-8")).hexdigest(),
+        }
+
+        # 4) headers no-cache per evitare qualsiasi caching
+        resp = make_response(jsonify(payload), 200)
+        resp.headers["Cache-Control"] = "no-store, max-age=0"
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
+        return resp
+
     except Exception as e:
         log.error(f"[PUT json] '{name}': {e}\n{traceback.format_exc()}")
         return jsonify(ok=False, error=str(e)), 500
