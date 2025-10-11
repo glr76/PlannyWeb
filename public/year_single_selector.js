@@ -1,4 +1,3 @@
-
 (function(){
   function getTerm(){ return document.getElementById('terminal'); }
   function tlog(msg, lvl){
@@ -14,8 +13,7 @@
       if(typeof log === 'function'){ try{ log(String(msg), lvl||'info'); }catch(_){ } }
     }catch(_){}
   }
-  function $(sel){ return document.querySelector(sel); }
-  function toInt(v, fb){ var n = parseInt(v,10); return isNaN(n)?fb:n; }
+
   function ensureBar(){
     var bar = document.getElementById('yearBarSingle');
     if(!bar){
@@ -66,60 +64,67 @@
     bar.appendChild(label); bar.appendChild(selWrap); bar.appendChild(btn);
     return { bar:bar, select:sel, button:btn };
   }
-  function fetchJSON(url){ return fetch(url,{cache:'no-store'}).then(function(r){ return r.ok?r.json():null; }); }
-  function fetchText(url){ return fetch(url,{cache:'no-store'}).then(function(r){ return r.ok?r.text():''; }); }
-  function getByPath(pathStr){
-    try{ var parts=String(pathStr).split('.'); var cur=window; for(var i=0;i<parts.length;i++){ cur = cur[parts[i]]; if(!cur) return null; } return cur; }catch(e){ return null; }
-  }
-  function resolveImporter(maxWaitMs, preferredPath, cb){
-    var waited = 0;
-    var tryList = [
-      'importSelectionsFromText','importSelections','loadSelectionsFromText','loadSelections',
-      'applySelectionsFromText','applySelections','setSelectionsFromText',
-      'planner.importSelectionsFromText','Planner.importSelectionsFromText',
-      'app.importSelectionsFromText','App.importSelectionsFromText'
-    ];
-    function step(){
-      var fn = null;
-      if(preferredPath){ fn = getByPath(preferredPath); if(typeof fn==='function'){ return cb(fn, preferredPath); } }
-      for(var i=0;i<tryList.length;i++){ var cand=getByPath(tryList[i]); if(typeof cand==='function'){ return cb(cand, tryList[i]); } }
-      waited += 200; if(waited>=maxWaitMs){ return cb(null,null); } setTimeout(step,200);
-    }
-    step();
-  }
+
   function refreshUI(){
     var fns=['renderCalendar','refreshCalendar','renderPlanner','buildCalendar','drawCalendar','updateCalendarUI','renderMonthly','renderVisualPlanner','refreshUI','updateUI'];
-    var called=false; for(var j=0;j<fns.length && !called;j++){ var fn=fns[j]; if(typeof window[fn]==='function'){ try{ window[fn](); tlog('Ridisegno via '+fn,'ok'); called=true; }catch(e){ tlog('Errore redraw '+fn+': '+e,'error'); } } }
-    if(!called){ try{ document.dispatchEvent(new CustomEvent('planner:reload',{detail:{reason:'single-year'}})); window.dispatchEvent(new CustomEvent('planner:year-changed',{detail:{year:window.state.year}})); tlog('Eventi planner dispatchati','info'); }catch(e){ tlog('Errore dispatch eventi: '+e,'warn'); } }
+    var called=false; 
+    for(var j=0;j<fns.length && !called;j++){
+      var fn=fns[j]; 
+      if(typeof window[fn]==='function'){
+        try{ window[fn](); tlog('Ridisegno via '+fn,'ok'); called=true; }
+        catch(e){ tlog('Errore redraw '+fn+': '+e,'error'); }
+      }
+    }
+    if(!called){
+      try{
+        document.dispatchEvent(new CustomEvent('planner:reload',{detail:{reason:'single-year'}}));
+        window.dispatchEvent(new CustomEvent('planner:year-changed',{detail:{year:window.state.year}}));
+        tlog('Eventi planner dispatchati','info');
+      }catch(e){ tlog('Errore dispatch eventi: '+e,'warn'); }
+    }
   }
+
   function applyYear(year, els){
-    window.state = window.state || {}; window.state.year = parseInt(year,10)||new Date().getFullYear(); tlog('Carico anno '+window.state.year,'ok');
+    window.state = window.state || {}; 
+    window.state.year = parseInt(year,10)||new Date().getFullYear(); 
+    tlog('Carico anno '+window.state.year,'ok');
     if(els && els.button){ els.button.disabled=true; els.button.textContent='Carico…'; }
+
     try{ if(typeof loadHolidaysFromLocalOrWeb==='function'){ loadHolidaysFromLocalOrWeb(); } }catch(e){}
-    var url='/api/selections/'+String(window.state.year); var pref=(window.__SINGLE_IMPORTER && typeof window.__SINGLE_IMPORTER==='string')?window.__SINGLE_IMPORTER:null;
-    resolveImporter(8000, pref, function(importer, pathStr){
-      if(!importer){ tlog('Importer non trovato. Imposta `window.__SINGLE_IMPORTER = "nomeFunzione"`.', 'warn'); } else { tlog('Importer risolto: '+(pathStr||'(fn)'),'info'); }
-      fetchText(url).then(function(t){
-        var text=t||''; if(!text){ tlog('Nessun selections per '+window.state.year+' (vuoto o assente). Pulizia e redraw.','warn'); } else { tlog('Selections '+window.state.year+' caricati ('+text.length+' chars)','ok'); }
-        if(importer){ try{ importer.call(window,text); }catch(e){ tlog('Errore in importer: '+e,'error'); } } else { window.__singleSelectionsText=text; }
-        refreshUI(); if(els && els.button){ els.button.disabled=false; els.button.textContent='Carica'; }
-      })['catch'](function(e){
-        tlog('Errore fetch selections: '+e,'error'); if(importer){ try{ importer.call(window,''); }catch(_){ } } else { window.__singleSelectionsText=''; }
-        refreshUI(); if(els && els.button){ els.button.disabled=false; els.button.textContent='Carica'; }
-      });
-    });
+    refreshUI(); 
+    if(els && els.button){ els.button.disabled=false; els.button.textContent='Carica'; }
   }
+
+  // ✅ versione senza /api/years
   function populateYears(els, done){
-    fetch('/api/years',{cache:'no-store'}).then(function(r){ return r.ok?r.json():null; }).then(function(data){
-      var years=(data && data.ok && data.years)?data.years.slice():[]; years.sort(function(a,b){return a-b;});
-      els.select.innerHTML=''; for(var i=0;i<years.length;i++){ var y=years[i],opt=document.createElement('option'); opt.value=y; opt.textContent=y; els.select.appendChild(opt); }
-      var now=new Date().getFullYear(); var def=(years.indexOf(now)>=0)?now:(years.length?years[years.length-1]:now); els.select.value=def; tlog('Anni disponibili: '+(years.join(', ')||'(nessuno)')+' | selezionato '+els.select.value,'info'); done(parseInt(els.select.value,10)||now);
-    })['catch'](function(e){
-      var now=new Date().getFullYear(); els.select.innerHTML=''; var opt=document.createElement('option'); opt.value=now; opt.textContent=now; els.select.appendChild(opt); done(now);
+    var now = new Date().getFullYear();
+    var years = [now - 1, now, now + 1, now + 2];
+    els.select.innerHTML = '';
+    for (var i = 0; i < years.length; i++) {
+      var y = years[i];
+      var opt = document.createElement('option');
+      opt.value = y;
+      opt.textContent = y;
+      els.select.appendChild(opt);
+    }
+    els.select.value = now;
+    tlog('Anni disponibili (statici): ' + years.join(', '), 'info');
+    done(now);
+  }
+
+  function init(){
+    var els=ensureBar();
+    populateYears(els,function(defYear){
+      applyYear(defYear,els);
+      els.button.addEventListener('click',function(){ applyYear(els.select.value,els); });
+      els.select.addEventListener('change',function(){ applyYear(els.select.value,els); });
     });
   }
-  function init(){
-    var els=ensureBar(); populateYears(els,function(defYear){ applyYear(defYear,els); els.button.addEventListener('click',function(){ applyYear(els.select.value,els); }); els.select.addEventListener('change',function(){ applyYear(els.select.value,els); }); });
+
+  if(!window.__singleYearInstalled){
+    window.__singleYearInstalled=true;
+    if(document.readyState==='loading'){
+      document.addEventListener('DOMContentLoaded', init);
+    } else { setTimeout(init,0); }
   }
-  if(!window.__singleYearInstalled){ window.__singleYearInstalled=true; if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init); } else { setTimeout(init,0);} }
 })();
