@@ -914,51 +914,6 @@ function makeCell(date,name){
     else if(val==='REC FERIE'){ input.style.color='#8b5cf6'; input.style.fontWeight='700'; input.style.fontSize='18px'; }
   }
 
-  /* ------- Export XLSX via server (auto, salva in /public) ------- */
-  function makeWorkbookData(){
-    const y=state.year, names=getColumns(), monthly=new Map(); for(let m=1;m<=12;m++) monthly.set(m,new Map());
-    for(const [k,v] of state.selections.entries()){
-      const [dateStr,name]=k.split(',');
-      const d=dateStr.split('-').map(Number); const yyyy=d[2], mm=d[1];
-      if(yyyy!==y) continue;
-      if(!monthly.get(mm).has(dateStr)) monthly.get(mm).set(dateStr,{});
-      monthly.get(mm).get(dateStr)[name]=v;
-    }
-    const headers=['Data'].concat(names), sheets={};
-    for(let m=1;m<=12;m++){
-      const rows=[headers], total=new Date(y,m,0).getDate();
-      for(let d=1; d<=total; d++){
-        const date=new Date(y,m-1,d), dateStr=fmt(date);
-        const row=headers.map(h=> h==='Data'?dateStr:(monthly.get(m).get(dateStr)||{})[h]||'');
-        rows.push(row);
-      }
-      sheets[months[m-1]]=rows;
-    }
-    return {sheets};
-  }
-  async function exportXLSXServerSave(){
-    try{
-      const data = makeWorkbookData();
-      const name = 'monthly_data_'+state.year+'.xlsx';
-      const r = await fetch('/api/export/xlsx/save', {
-        method:'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ filename: name, sheets: data.sheets })
-      });
-      if(!r.ok){
-        const txt = await r.text().catch(()=> '');
-        throw new Error('HTTP '+r.status+' '+txt);
-      }
-      const js = await r.json().catch(()=>null);
-      if(js && js.ok){
-        log('Excel aggiornato sul server: '+(js.path||name), 'ok');
-      }else{
-        log('Excel salvato (risposta non-JSON o senza ok).', 'warn');
-      }
-    }catch(e){
-      log('Errore salvataggio Excel server: '+(e.message||e), 'warn');
-    }
-  }
 
   // Espongo importer selections per year_single_selector.js
   window.importSelectionsFromText = importSelectionsFromText;
@@ -972,7 +927,6 @@ function makeCell(date,name){
       save.logName = 'planny_log_'+state.year+'.txt';
       loadHolidaysFromLocalOrWeb().then(()=>{
         renderAndJumpToToday();
-        exportXLSXServerSave();
         appendLogsToServer({force:true});
       });
     }catch(e){
@@ -1038,7 +992,6 @@ function makeCell(date,name){
     try{
       await saveSelectionsToServer();
       await appendLogsToServer();
-      await exportXLSXServerSave();
     }catch(e){ log('Errore saveNow: '+(e.message||e),'warn'); }
   }
 
@@ -1048,7 +1001,6 @@ function makeCell(date,name){
     saveTimer = setTimeout(async ()=>{
       await saveSelectionsToServer();
       await appendLogsToServer();
-      await exportXLSXServerSave();
     }, 800);
   }
 
@@ -1494,7 +1446,6 @@ document.addEventListener('keydown', (e)=>{
 
       renderAndJumpToToday();
 
-      await exportXLSXServerSave();
     }catch(e){
       log('Errore in autoload: '+e.message,'err');
     }
