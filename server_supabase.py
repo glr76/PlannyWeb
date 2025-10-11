@@ -1,9 +1,10 @@
 # server_supabase.py
 import os
 import logging
+import traceback
 from flask import Flask, request, send_from_directory, Response, jsonify, abort
 from flask_cors import CORS
-from supabase import create_client
+from supabase import create_client, Client
 
 # ----------------------------------------------------
 # Config
@@ -11,19 +12,20 @@ from supabase import create_client
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 PUBLIC_DIR = os.path.join(BASE_DIR, "public")
 
-SUPABASE_URL = os.environ["SUPABASE_URL"]
-# Service Role per scrivere in Storage (se non c'è, ripiega su anon, sconsigliato per write)
-SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE") or os.environ["SUPABASE_ANON_KEY"]
-BUCKET       = os.environ.get("SUPABASE_BUCKET", "planny-txt")
+SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
+# Preferisci la Service Role (due nomi possibili), altrimenti fallback a ANON
+SUPABASE_KEY = (
+    os.environ.get("SUPABASE_SERVICE_ROLE")
+    or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    or os.environ["SUPABASE_ANON_KEY"]
+)
+BUCKET = os.environ.get("SUPABASE_BUCKET", "planny-txt")
 
-# Supabase client
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Flask
-app = Flask(__name__, static_folder=PUBLIC_DIR, static_url_path="")
-CORS(app)
+app = Flask(__name__, static_folder=PUBLIC_DIR, static_url_path="/static")
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-# Logging utile per debug 500
 logging.basicConfig(level=logging.INFO)
 log = app.logger
 
@@ -32,8 +34,8 @@ log = app.logger
 # Helpers Storage
 # ----------------------------------------------------
 def _sanitize(name: str) -> str:
-    # niente percorsi assoluti / traversal
-    name = name.strip().replace("\\", "/")
+    """Evita percorsi strani e normalizza gli slash."""
+    name = (name or "").strip().replace("\\", "/")
     while "//" in name:
         name = name.replace("//", "/")
     if name.startswith("/"):
@@ -42,46 +44,138 @@ def _sanitize(name: str) -> str:
         raise ValueError("Invalid path")
     return name
 
+
 def _download_text(path: str) -> str:
     try:
         data = supabase.storage.from_(BUCKET).download(path)
-        return data.decode("utf-8")
+        return data.decode("utf-8", "replace")
     except Exception as e:
-        log.warning(f"download fail [{path}]: {e}")
+        log.warning(f"[download] fail '{path}': {e}")
         return ""
+
 
 def _upload_text(path: str, content: str):
     data = content.encode("utf-8")
+    # 1) tenta UPDATE
     try:
-        # 1) tenta update (sovrascrive se esiste)
         supabase.storage.from_(BUCKET).update(path, data)
         return
     except Exception as e:
-        log.info(f"update miss for [{path}] -> trying upload: {e}")
-    # 2) se non esiste, crea con upload
+        log.info(f"[update] miss '{path}' -> try upload: {e}")
+    # 2) fallback UPLOAD (crea)
     try:
-        # alcune versioni SDK supportano upsert=True:
-        # supabase.storage.from_(BUCKET).upload(path, data, {"contentType":"text/plain; charset=utf-8", "upsert": True})
-        supabase.storage.from_(BUCKET).upload(path, data, {"contentType":"text/plain; charset=utf-8"})
+        # alcune versioni supportano "upsert": True
+        supabase.storage.from_(BUCKET).upload(
+            path,
+            data,
+            {"contentType": "text/plain; charset=utf-8"},
+        )
         return
     except Exception as e:
-        log.error(f"upload fail [{path}]: {e}", exc_info=True)
+        log.error(f"[upload] fail '{path}': {e}\n{traceback.format_exc()}")
         raise
 
 
 # ----------------------------------------------------
-# STATIC
+# API FILES - JSON (raccomandato)
+# ----------------------------------------------------
+@app.get("/api/files/text/<path:name>")
+def api_text_get(name: str):
+    try:
+        fname = _sanitize(name)
+        txt = _download_text(fname)
+        if txt == "":
+            return jsonify(ok=False, name=fname, text=""), 404
+        return jsonify(ok=True, name=fname, text=txt)
+    except Exception as e:
+        log.error(f"[GET json] '{name}': {e}\n{traceback.format_exc()}")
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.put("/api/files/text/<path:name>")
+def api_text_put(name: str):
+    try:
+        fname = _sanitize(name)
+        raw = request.get_data(as_text=True) or ""
+        _upload_text(fname, raw)
+        return jsonify(ok=True, name=fname, size=len(raw))
+    except Exception as e:
+        log.error(f"[PUT json] '{name}': {e}\n{traceback.format_exc()}")
+        return jsonify(ok=False, error=str(e)), 500
+
+
+# ----------------------------------------------------
+# API FILES - Legacy (testo puro)
+# ----------------------------------------------------
+@app.get("/api/files/<path:name>")
+def api_read_text_legacy(name: str):
+    try:
+        fname = _sanitize(name)
+        txt = _download_text(fname)
+        if txt == "":
+            return Response("", status=404, mimetype="text/plain; charset=utf-8")
+        headers = {
+            "Cache-Control": "no-store, max-age=0",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Disposition": f'inline; filename="{os.path.basename(fname)}"',
+        }
+        return Response(txt, mimetype="text/plain; charset=utf-8", headers=headers)
+    except Exception as e:
+        log.error(f"[GET legacy] '{name}': {e}\n{traceback.format_exc()}")
+        return Response("error", status=500, mimetype="text/plain; charset=utf-8")
+
+
+@app.put("/api/files/<path:name>")
+def api_write_text_legacy(name: str):
+    try:
+        fname = _sanitize(name)
+        raw = request.get_data(as_text=True) or ""
+        _upload_text(fname, raw)
+        return jsonify(ok=True, path=fname, size=len(raw))
+    except Exception as e:
+        log.error(f"[PUT legacy] '{name}': {e}\n{traceback.format_exc()}")
+        return jsonify(ok=False, error=str(e)), 500
+
+
+# ----------------------------------------------------
+# LIST + HEALTH + STUB EXPORT
+# ----------------------------------------------------
+@app.get("/api/files/list")
+def api_list_files():
+    try:
+        items = supabase.storage.from_(BUCKET).list("", {"limit": 1000})
+        files = [{"name": it.get("name"), "updated_at": it.get("updated_at")} for it in items]
+        return jsonify(ok=True, bucket=BUCKET, count=len(files), files=files)
+    except Exception as e:
+        log.error(f"[LIST] {e}\n{traceback.format_exc()}")
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.post("/api/export/xlsx/save")
+def api_export_xlsx_save():
+    # Stub per evitare 404 finché l'export non serve
+    return jsonify(ok=True, skipped=True, reason="xlsx export disabled")
+
+
+@app.get("/healthz")
+def healthz():
+    return "ok"
+
+
+# ----------------------------------------------------
+# STATIC (/public) – dichiarato DOPO le API per non interferire
 # ----------------------------------------------------
 @app.get("/")
 def index():
-    # /public/index.html
     ix = os.path.join(PUBLIC_DIR, "index.html")
     if not os.path.exists(ix):
         return "index.html non trovato in /public", 404
     return send_from_directory(PUBLIC_DIR, "index.html")
 
+
 @app.get("/<path:asset>")
 def static_files(asset):
+    # NON si occupa di /api/... (quelle route hanno la precedenza)
     path = os.path.join(PUBLIC_DIR, asset)
     if not os.path.exists(path):
         abort(404)
@@ -90,22 +184,7 @@ def static_files(asset):
 
 
 # ----------------------------------------------------
-# API FILES - TEXT (legacy) e JSON (raccomandato)
+# MAIN (sviluppo)
 # ----------------------------------------------------
-# GET testo puro
-@app.get("/api/files/<path:name>")
-def api_read_text_legacy(name):
-    try:
-        name = _sanitize(name)
-        txt = _download_text(name)
-        if txt == "":
-            return Response("", status=404, mimetype="text/plain; charset=utf-8")
-        return Response(txt, mimetype="text/plain; charset=utf-8")
-    except Exception as e:
-        log.error(f"GET legacy error [{name}]: {e}", exc_info=True)
-        return Response("error", status=500, mimetype="text/plain; charset=utf-8")
-
-# PUT testo puro
-@app.put("/api/files/<path:name>")
-def api_write_text_legacy(name):
-   
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
