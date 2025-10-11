@@ -77,12 +77,108 @@
   </section>
 </main>
 
-<!-- Tutto il tuo codice originale rimane invariato sotto -->
+<!-- ===================================================== -->
+<!-- 1️⃣ ADAPTER: collega year_single_selector.js al planner -->
+<!-- ===================================================== -->
+<script>
+  // Nomi che year_single_selector.js si aspetta
+  window.__SINGLE_IMPORTER = "plannyImporter";
+  window.__SINGLE_RENDERER = "plannyRenderer";
 
+  // Inoltra alle funzioni reali del planner
+  function plannyImporter(text) {
+    if (typeof window.importSelectionsFromText === 'function') {
+      return window.importSelectionsFromText(text);
+    }
+    if (typeof window.importSelections === 'function') {
+      return window.importSelections(text);
+    }
+    console.warn('[Importer] Manca importSelectionsFromText (o alias).');
+  }
+
+  function plannyRenderer() {
+    if (typeof window.renderCalendar === 'function') {
+      return window.renderCalendar();
+    }
+    if (typeof window.render === 'function') {
+      return window.render();
+    }
+    console.warn('[Renderer] Manca renderCalendar (o alias).');
+  }
+</script>
+
+<!-- ==================================================================== -->
+<!-- 2️⃣ SHIM ENDPOINT: crea risposte per /api/years e /api/selections/YYYY -->
+<!-- ==================================================================== -->
+<script>
+(function () {
+  const origFetch = window.fetch.bind(window);
+
+  function jsonResponse(obj, status = 200) {
+    return new Response(JSON.stringify(obj), {
+      status,
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-store, max-age=0'
+      }
+    });
+  }
+
+  async function listYears() {
+    try {
+      const r = await origFetch('/api/files/list', { cache: 'no-store' });
+      if (!r.ok) return [];
+      const j = await r.json().catch(() => ({}));
+      const files = Array.isArray(j.files) ? j.files : [];
+      const years = [];
+      for (const it of files) {
+        const name = it?.name || '';
+        const m = /^selections_(\d{4})\.txt$/i.exec(name);
+        if (m) years.push(+m[1]);
+      }
+      return [...new Set(years)].sort((a, b) => a - b);
+    } catch { return []; }
+  }
+
+  async function getSelectionsYear(year) {
+    const r1 = await origFetch('/api/files/' + encodeURIComponent(`selections_${year}.txt`) + '?' + Date.now(), { cache:'no-store' });
+    if (r1.ok) return { ok:true, year, text: await r1.text() };
+
+    const r2 = await origFetch('/api/files/text/' + encodeURIComponent(`selections_${year}.txt`) + '?' + Date.now(), { cache:'no-store' });
+    if (!r2.ok) return { ok:false, year, text:'' };
+    const j = await r2.json().catch(()=>({ ok:false }));
+    if (j && j.ok) return { ok:true, year, text:j.text || '' };
+    return { ok:false, year, text:'' };
+  }
+
+  window.fetch = async function (input, init) {
+    const url = (typeof input === 'string') ? input : (input?.url || '');
+    try {
+      if (/\/api\/years(?:\?|$)/.test(url)) {
+        const years = await listYears();
+        return jsonResponse({ ok: true, years });
+      }
+      const m = /\/api\/selections\/(\d{4})(?:\?|$)/.exec(url);
+      if (m) {
+        const yr = +m[1];
+        const payload = await getSelectionsYear(yr);
+        return jsonResponse(payload, payload.ok ? 200 : 404);
+      }
+    } catch {}
+    return origFetch(input, init);
+  };
+})();
+</script>
+
+<!-- ================================================= -->
+<!-- 3️⃣ SELETTORE ANNO - caricato dopo l'adapter/shim -->
+<!-- ================================================= -->
 <script src="year_single_selector.js"></script>
 
+<!-- ================================================= -->
+<!-- 4️⃣ PATCH: spia salvataggio e blocco refresh -->
+<!-- ================================================= -->
 <script>
-  /* --- PATCH: Gestione spia salvataggio + blocco refresh --- */
   (function(){
     let dirty = false, saving = false, autosaveTimer = null;
     const indicator = document.getElementById('save-indicator');
@@ -91,7 +187,8 @@
     const terminal = document.getElementById('terminal');
 
     function log(msg){
-      terminal.value += `\n${msg}`;
+      const t = new Date().toLocaleTimeString();
+      terminal.value += `\n[${t}] ${msg}`;
       terminal.scrollTop = terminal.scrollHeight;
     }
     function updateIndicator(){
@@ -102,25 +199,23 @@
     function setDirty(v){ dirty = !!v; updateIndicator(); }
     function setSaving(v){ saving = !!v; updateIndicator(); }
 
-    // Blocca refresh se non salvato
     window.addEventListener('beforeunload', e=>{
       if(dirty || saving){ e.preventDefault(); e.returnValue=''; }
     });
 
-    // Intercetta saveNow (se esiste)
     const origSaveNow = window.saveNow;
     window.saveNow = async function(){
       setSaving(true);
       try{
         if(typeof origSaveNow === 'function'){ await origSaveNow(); }
         setDirty(false);
+        log('Salvataggio completato.');
       }catch(e){
-        log('[ERRORE salvataggio] ' + e.message);
+        log('ERRORE salvataggio: ' + e.message);
       }
       setSaving(false);
     };
 
-    // Hook su writeCell per marcare modifiche
     const origWriteCell = window.writeCell;
     if(origWriteCell) {
       window.writeCell = function(...args){
@@ -136,7 +231,9 @@
   })();
 </script>
 
-<!-- Rimozione totale export Excel e download -->
+<!-- ================================================= -->
+<!-- 5️⃣ Rimozione totale export Excel/download -->
+<!-- ================================================= -->
 <script>
   async function exportXLSXServerSave(){ return { ok:true, skipped:true }; }
 </script>
