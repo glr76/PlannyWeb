@@ -34,7 +34,7 @@
             <span class="dot ok"></span><span class="label">salvato</span>
           </span>
         </h1>
-        <!-- Se il tuo year_single_selector.js inietta la sua UI, non serve altro markup -->
+        <!-- Se il tuo year_single_selector.js inietta una UI, può usare questo contenitore -->
         <div id="year-selector"></div>
       </div>
     </div>
@@ -49,24 +49,37 @@
     </section>
   </main>
 
-  <!-- 1) ESPONI L'IMPORTER/RENDERER PRIMA di caricare year_single_selector.js -->
+  <!-- ADAPTER GLOBALE: definisci importer/renderer PRIMA del selettore -->
   <script>
-    // Se le funzioni sono definite da altri script inline/esterni, esponile su window se già presenti
-    if (typeof importSelectionsFromText === 'function') {
-      window.importSelectionsFromText = importSelectionsFromText;
+    // Indica al selettore i nomi delle funzioni globali da invocare
+    window.__SINGLE_IMPORTER = "plannyImporter";
+    window.__SINGLE_RENDERER = "plannyRenderer";
+
+    // Adapter che inoltra alle tue funzioni reali se esistono
+    function plannyImporter(text) {
+      if (typeof window.importSelectionsFromText === 'function') {
+        return window.importSelectionsFromText(text);
+      }
+      if (typeof window.importSelections === 'function') {
+        return window.importSelections(text);
+      }
+      console.warn('[Importer] Nessuna funzione reale trovata (importSelectionsFromText/importSelections).');
     }
-    if (typeof renderCalendar === 'function') {
-      window.renderCalendar = renderCalendar;
+    function plannyRenderer() {
+      if (typeof window.renderCalendar === 'function') {
+        return window.renderCalendar();
+      }
+      if (typeof window.render === 'function') {
+        return window.render();
+      }
+      console.warn('[Renderer] Nessuna funzione di render trovata (renderCalendar/render).');
     }
-    // Dì al selettore quale importer/renderer usare
-    window.__SINGLE_IMPORTER = "importSelectionsFromText";
-    window.__SINGLE_RENDERER = "renderCalendar";
   </script>
 
   <!-- Il tuo script che gestisce la scelta dell'anno -->
   <script src="year_single_selector.js"></script>
 
-  <!-- 2) SHIM FETCH: risponde a /api/years e /api/selections/<anno> come si aspetta il selettore -->
+  <!-- SHIM FETCH: fornisce /api/years e /api/selections/<anno> come si aspetta il selettore -->
   <script>
   (function(){
     const origFetch = window.fetch.bind(window);
@@ -95,12 +108,13 @@
     }
 
     async function getSelectionsYear(year){
-      // PRIMA prova legacy (evita 500 in console), poi JSON
+      // 1) prova legacy (meno rumorosa se il JSON dà 500)
       const rLegacy = await origFetch('/api/files/' + encodeURIComponent(`selections_${year}.txt`) + '?' + Date.now(), { cache:'no-store' });
       if (rLegacy.ok) {
         const text = await rLegacy.text();
         return { ok:true, year, text };
       }
+      // 2) fallback JSON
       const url = '/api/files/text/' + encodeURIComponent(`selections_${year}.txt`) + '?' + Date.now();
       const r = await origFetch(url, { cache:'no-store' });
       if (!r.ok) return { ok:false, year, text:'' };
@@ -128,7 +142,7 @@
   })();
   </script>
 
-  <!-- I/O CLOUD standard: prova PRIMA il legacy (niente 500), poi il JSON -->
+  <!-- I/O CLOUD standard: prima legacy, poi JSON; niente download -->
   <script>
   async function getTextFromServer(name){
     // 1) legacy text
@@ -144,7 +158,6 @@
   }
 
   async function putTextToServer(name, content){
-    // Lasciamo la PUT sul JSON (così il server può restituire echo/SHA se previsto)
     const r = await fetch('/api/files/text/' + encodeURIComponent(name), {
       method: 'PUT',
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
@@ -155,7 +168,7 @@
     return j;
   }
 
-  // Blocca click verso .txt/.ini (evita download)
+  // Evita qualunque link diretto ai .txt/.ini (niente download)
   (function(){
     const KEY_RX = /(^|\/)(config\.ini|config\.txt|selections_\d{4}\.txt|festivi_\d{4}\.txt)$/i;
     document.addEventListener('click', function(ev){
@@ -190,7 +203,7 @@
     function setDirty(v){ __dirty=!!v; updateSaveIndicator(); }
     function setSaving(v){ __saving=!!v; updateSaveIndicator(); }
 
-    window.addEventListener('beforeunload',(e)=>{
+    window.addEventListener('beforeunload",(e)=>{
       if(__dirty || __saving){ e.preventDefault(); e.returnValue=''; return ''; }
     });
 
@@ -246,14 +259,14 @@
     async function exportXLSXServerSave(){ return { ok:true, skipped:true }; }
   </script>
 
-  <!-- Boot “gentile”: il selettore pensa all’anno; come fallback prova l’anno corrente -->
+  <!-- Boot “gentile”: lascia la gestione anno al selettore; fallback anno corrente -->
   <script>
   (function(){
     async function loadAndRender(year){
       try{
         const txt = await window.getTextFromServer(`selections_${year}.txt`);
-        if (typeof window.importSelectionsFromText === 'function') window.importSelectionsFromText(txt||'');
-        if (typeof window.renderCalendar === 'function') window.renderCalendar();
+        if (typeof window.plannyImporter === 'function') window.plannyImporter(txt||'');
+        if (typeof window.plannyRenderer === 'function') window.plannyRenderer();
       }catch(e){
         const term=document.getElementById('terminal');
         if(term){ term.value += '\n[errore] load '+year+': '+e; term.scrollTop=term.scrollHeight; }
