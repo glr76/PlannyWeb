@@ -6,15 +6,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <style>
-    /* Stili leggeri: non alterano la tua UI esistente */
     body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; margin:0; color:#111; background:#f7f7f9; }
     header { position:sticky; top:0; z-index:10; background:#fff; border-bottom:1px solid #e5e7eb; }
     .wrap { max-width:1100px; margin:0 auto; padding:16px 20px; }
     h1 { margin:0; font-size:20px; display:flex; align-items:center; gap:10px; }
     .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
     .card { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:12px; }
-    .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-    .toolbar input[type="number"]{ width:90px; padding:6px 8px; border:1px solid #cfd6df; border-radius:8px; }
     textarea#terminal{ width:100%; height:150px; font-family:ui-monospace,Menlo,Consolas,"Liberation Mono",monospace; font-size:12px; }
 
     /* Spia di salvataggio */
@@ -33,17 +30,13 @@
       <div class="row">
         <h1>
           Planny (HTML)
-          <!-- Spia sempre visibile -->
           <span id="save-indicator" title="Stato salvataggio">
             <span class="dot ok"></span><span class="label">salvato</span>
           </span>
         </h1>
-        <div class="toolbar">
-          <!-- Campo anno semplice (se il tuo year_single_selector inietta da solo la sua UI puoi anche rimuovere questo input) -->
-          <label>Anno
-            <input id="year" type="number" min="2000" max="2100" step="1" />
-          </label>
-        </div>
+
+        <!-- Contenitore opzionale: se il tuo year_single_selector.js inietta qui la UI -->
+        <div id="year-selector"></div>
       </div>
     </div>
   </header>
@@ -57,10 +50,10 @@
     </section>
   </main>
 
-  <!-- Dì a year_single_selector qual è l'importer (e opzionale renderer) -->
+  <!-- Dì al selettore quale importer (e, se serve, renderer) usare -->
   <script>window.__SINGLE_IMPORTER = "importSelectionsFromText"; window.__SINGLE_RENDERER = "renderCalendar";</script>
 
-  <!-- Il tuo script esistente -->
+  <!-- Il tuo script esistente (gestisce SELEZIONE ANNO e UI relativa) -->
   <script src="year_single_selector.js"></script>
 
   <!-- ====== SHIM FETCH: mappa /api/years e /api/selections/<anno> a endpoint esistenti ====== -->
@@ -76,7 +69,6 @@
     }
 
     async function listYearsFromBucket(){
-      // Usa la lista file e ricava gli anni da selections_YYYY.txt
       try{
         const r = await origFetch('/api/files/list', { cache:'no-store' });
         if (!r.ok) return [];
@@ -93,11 +85,9 @@
     }
 
     async function getSelectionsYear(year){
-      // Legge selections_YEAR.txt via endpoint JSON esistente
       const url = '/api/files/text/' + encodeURIComponent(`selections_${year}.txt`) + '?' + Date.now();
       const r = await origFetch(url, { cache:'no-store' });
       if (!r.ok){
-        // prova fallback legacy testuale
         const r2 = await origFetch('/api/files/' + encodeURIComponent(`selections_${year}.txt`) + '?' + Date.now(), { cache:'no-store' });
         if (!r2.ok) return { ok:false, year, text:'' };
         const text = await r2.text();
@@ -111,20 +101,17 @@
     window.fetch = async function(input, init){
       try{
         const url = (typeof input === 'string') ? input : (input && input.url ? input.url : '');
-        // Intercetta /api/years
         if (/\/api\/years(?:\?|$)/.test(url)){
           const years = await listYearsFromBucket();
           return jsonResponse({ ok:true, years });
         }
-        // Intercetta /api/selections/<anno>
         const m = /\/api\/selections\/(\d{4})(?:\?|$)/.exec(url);
         if (m){
           const yr = +m[1];
           const payload = await getSelectionsYear(yr);
           return jsonResponse(payload, payload.ok ? 200 : 404);
         }
-      }catch(_){ /* passa sotto al fetch originale */ }
-      // Pass-through per tutto il resto
+      }catch(_){ }
       return origFetch(input, init);
     };
   })();
@@ -141,7 +128,6 @@
         if (j && j.ok) return j.text || '';
       }
     }catch(_){}
-    // fallback legacy testuale
     const r2 = await fetch('/api/files/' + encodeURIComponent(name) + '?' + Date.now(), { cache:'no-store' });
     if (r2.ok) return await r2.text();
     return '';
@@ -193,12 +179,10 @@
     function setDirty(v){ __dirty=!!v; updateSaveIndicator(); }
     function setSaving(v){ __saving=!!v; updateSaveIndicator(); }
 
-    // Blocca refresh/chiusura se non salvato
     window.addEventListener('beforeunload',(e)=>{
       if(__dirty || __saving){ e.preventDefault(); e.returnValue=''; return ''; }
     });
 
-    // Decora writeCell (se esiste) per marcare sporco + autosave
     if(typeof window.writeCell==='function'){
       const __origWriteCell = window.writeCell;
       window.writeCell = function(...args){
@@ -208,7 +192,6 @@
       };
     }
 
-    // Debounce autosave se non esiste un tuo scheduler
     const __origSchedule = window.scheduleAutoSave;
     window.scheduleAutoSave = function(...args){
       setDirty(true);
@@ -217,7 +200,6 @@
       __saveTimer=setTimeout(()=>{ try{ window.saveNow(); }catch(_){ } }, 800);
     };
 
-    // wrap saveNow per mostrare stato e azzerare sporco
     const __origSaveNow = window.saveNow;
     window.saveNow = async function(...args){
       setSaving(true);
@@ -227,7 +209,6 @@
           setDirty(false);
           return r;
         }else{
-          // fallback: salva le selections correnti su server
           if(typeof window.selectionsToText==='function'){
             const y = (window.state && window.state.year) ? window.state.year : (new Date().getFullYear());
             const name = `selections_${y}.txt`;
@@ -243,10 +224,7 @@
       }
     };
 
-    // esponi per eventuale debug
     window.__saveIndicator={ setDirty, setSaving, updateSaveIndicator };
-
-    // init spia
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', updateSaveIndicator);
     else updateSaveIndicator();
   })();
@@ -260,14 +238,6 @@
   <!-- ====== Boot: carica selections_<anno>.txt e renderizza con le TUE funzioni ====== -->
   <script>
   (function(){
-    function detectYear(){
-      if (window.state && window.state.year) return +window.state.year;
-      const sel = document.getElementById('year');
-      if (sel && sel.value) return +sel.value;
-      const saved = +localStorage.getItem('plannyYear') || 0;
-      const now = new Date().getFullYear();
-      return saved || now;
-    }
     async function loadAndRender(year){
       try{
         const txt = await window.getTextFromServer(`selections_${year}.txt`);
@@ -279,22 +249,15 @@
       }
     }
     async function boot(){
-      const y = detectYear();
-      window.state = window.state || {}; window.state.year = y;
-
-      const sel = document.getElementById('year');
-      if (sel) {
-        sel.value = String(y);
-        sel.addEventListener('change', async ()=> {
-          const v = parseInt(sel.value, 10);
-          if (!Number.isNaN(v)) {
-            window.state.year = v;
-            localStorage.setItem('plannyYear', String(v));
-            await loadAndRender(v);
-          }
-        });
-      }
-      await loadAndRender(y);
+      // L'anno viene deciso da year_single_selector.js: qui non forziamo nulla.
+      // Se serve un primo render, year_single_selector richiamerà import/render da solo.
+      // In fallback (se il selettore non parte), prova a caricare l'anno corrente:
+      setTimeout(async ()=>{
+        if (!window.state || !window.state.year) {
+          const now = new Date().getFullYear();
+          await loadAndRender(now);
+        }
+      }, 800);
     }
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
   })();
