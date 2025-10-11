@@ -5,9 +5,9 @@
   <title>Planny (HTML)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Stili base leggeri; non toccano la tua UI esistente -->
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin:0; color:#111; background:#f7f7f9; }
+    /* Stili leggeri: non alterano la tua UI esistente */
+    body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; margin:0; color:#111; background:#f7f7f9; }
     header { position:sticky; top:0; z-index:10; background:#fff; border-bottom:1px solid #e5e7eb; }
     .wrap { max-width:1100px; margin:0 auto; padding:16px 20px; }
     h1 { margin:0; font-size:20px; display:flex; align-items:center; gap:10px; }
@@ -15,9 +15,9 @@
     .card { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:12px; }
     .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
     .toolbar input[type="number"]{ width:90px; padding:6px 8px; border:1px solid #cfd6df; border-radius:8px; }
-    textarea#terminal{ width:100%; height:150px; font-family:ui-monospace, Menlo, Consolas, "Liberation Mono", monospace; font-size:12px; }
+    textarea#terminal{ width:100%; height:150px; font-family:ui-monospace,Menlo,Consolas,"Liberation Mono",monospace; font-size:12px; }
 
-    /* Spia salvataggio */
+    /* Spia di salvataggio */
     #save-indicator{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#5b6877;user-select:none}
     #save-indicator .dot{width:10px;height:10px;border-radius:50%;display:inline-block;background:#aaa}
     #save-indicator .dot.ok{background:#16a34a}      /* verde */
@@ -39,7 +39,7 @@
           </span>
         </h1>
         <div class="toolbar">
-          <!-- Selettore anno: usa il tuo year_single_selector.js -->
+          <!-- Campo anno semplice (se il tuo year_single_selector inietta da solo la sua UI puoi anche rimuovere questo input) -->
           <label>Anno
             <input id="year" type="number" min="2000" max="2100" step="1" />
           </label>
@@ -49,23 +49,89 @@
   </header>
 
   <main class="wrap">
-    <!-- Il tuo calendario reale viene renderizzato dalle tue funzioni -->
     <section id="calendar" class="card"></section>
 
-    <!-- Terminale/log locali (facoltativo) -->
     <section class="card" style="margin-top:12px;">
       <h3 style="margin-top:0">Terminale</h3>
       <textarea id="terminal" placeholder="Log azioni…"></textarea>
     </section>
   </main>
 
-  <!-- Mantieni SOLO questo: lo script che ti serve -->
-  <script src="year_single_selector.js"></script>
-  <!-- (RIMOSSO: year_single_selector.fixed.js) -->
+  <!-- Dì a year_single_selector qual è l'importer (e opzionale renderer) -->
+  <script>window.__SINGLE_IMPORTER = "importSelectionsFromText"; window.__SINGLE_RENDERER = "renderCalendar";</script>
 
-  <!-- ====== CLOUD I/O: solo Supabase via backend, nessun download ====== -->
+  <!-- Il tuo script esistente -->
+  <script src="year_single_selector.js"></script>
+
+  <!-- ====== SHIM FETCH: mappa /api/years e /api/selections/<anno> a endpoint esistenti ====== -->
   <script>
-  // Lettura dal backend (JSON → text) con fallback legacy
+  (function(){
+    const origFetch = window.fetch.bind(window);
+
+    function jsonResponse(obj, status=200){
+      return new Response(JSON.stringify(obj), {
+        status,
+        headers: { 'Content-Type':'application/json; charset=utf-8', 'Cache-Control':'no-store, max-age=0' }
+      });
+    }
+
+    async function listYearsFromBucket(){
+      // Usa la lista file e ricava gli anni da selections_YYYY.txt
+      try{
+        const r = await origFetch('/api/files/list', { cache:'no-store' });
+        if (!r.ok) return [];
+        const j = await r.json().catch(()=>({}));
+        const files = Array.isArray(j.files) ? j.files : [];
+        const years = [];
+        for (const it of files){
+          const name = (it && it.name) ? String(it.name) : '';
+          const m = /^selections_(\d{4})\.txt$/i.exec(name);
+          if (m) years.push(+m[1]);
+        }
+        return Array.from(new Set(years)).sort((a,b)=>a-b);
+      }catch(_){ return []; }
+    }
+
+    async function getSelectionsYear(year){
+      // Legge selections_YEAR.txt via endpoint JSON esistente
+      const url = '/api/files/text/' + encodeURIComponent(`selections_${year}.txt`) + '?' + Date.now();
+      const r = await origFetch(url, { cache:'no-store' });
+      if (!r.ok){
+        // prova fallback legacy testuale
+        const r2 = await origFetch('/api/files/' + encodeURIComponent(`selections_${year}.txt`) + '?' + Date.now(), { cache:'no-store' });
+        if (!r2.ok) return { ok:false, year, text:'' };
+        const text = await r2.text();
+        return { ok:true, year, text };
+      }
+      const j = await r.json().catch(()=>({ok:false, text:''}));
+      if (j && j.ok) return { ok:true, year, text: j.text || '' };
+      return { ok:false, year, text:'' };
+    }
+
+    window.fetch = async function(input, init){
+      try{
+        const url = (typeof input === 'string') ? input : (input && input.url ? input.url : '');
+        // Intercetta /api/years
+        if (/\/api\/years(?:\?|$)/.test(url)){
+          const years = await listYearsFromBucket();
+          return jsonResponse({ ok:true, years });
+        }
+        // Intercetta /api/selections/<anno>
+        const m = /\/api\/selections\/(\d{4})(?:\?|$)/.exec(url);
+        if (m){
+          const yr = +m[1];
+          const payload = await getSelectionsYear(yr);
+          return jsonResponse(payload, payload.ok ? 200 : 404);
+        }
+      }catch(_){ /* passa sotto al fetch originale */ }
+      // Pass-through per tutto il resto
+      return origFetch(input, init);
+    };
+  })();
+  </script>
+
+  <!-- ====== I/O CLOUD standard: solo server, nessun download ====== -->
+  <script>
   async function getTextFromServer(name){
     const u = '/api/files/text/' + encodeURIComponent(name) + '?' + Date.now();
     try{
@@ -81,7 +147,6 @@
     return '';
   }
 
-  // Scrittura sul backend (JSON)
   async function putTextToServer(name, content){
     const r = await fetch('/api/files/text/' + encodeURIComponent(name), {
       method: 'PUT',
@@ -187,9 +252,8 @@
   })();
   </script>
 
-  <!-- ====== Export Excel DISATTIVATO (niente chiamate al server) ====== -->
+  <!-- ====== Export Excel DISATTIVATO ====== -->
   <script>
-    // Se qualche parte dell'UI lo invoca ancora, non farà nulla e non darà errori
     async function exportXLSXServerSave(){ return { ok:true, skipped:true }; }
   </script>
 
