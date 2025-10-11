@@ -14,7 +14,14 @@
     }catch(_){}
   }
 
-  function ensureBar(){
+  // Se esiste già un select#yearSingle, usalo e NON creare la barra
+  function ensureUI(){
+    var existing = document.querySelector('#yearSingle');
+    if (existing) {
+      tlog('Trovato select#yearSingle già presente in pagina: non creo la barra','info');
+      return { bar:null, select:existing, button:null, external:true };
+    }
+    // Altrimenti crea la barra in alto
     var bar = document.getElementById('yearBarSingle');
     if(!bar){
       bar = document.createElement('div');
@@ -62,7 +69,7 @@
     btn.onmouseenter = function(){ btn.style.background = '#111827'; };
     btn.onmouseleave = function(){ btn.style.background = '#0f172a'; };
     bar.appendChild(label); bar.appendChild(selWrap); bar.appendChild(btn);
-    return { bar:bar, select:sel, button:btn };
+    return { bar:bar, select:sel, button:btn, external:false };
   }
 
   function refreshUI(){
@@ -95,10 +102,18 @@
     if(els && els.button){ els.button.disabled=false; els.button.textContent='Carica'; }
   }
 
-  // ✅ versione senza /api/years
+  // Anni dinamici rispetto all'anno corrente, senza /api/years
   function populateYears(els, done){
     var now = new Date().getFullYear();
     var years = [now - 1, now, now + 1, now + 2];
+    // Se il select esiste ed è già popolato (HTML originale), non lo sovrascrivo
+    if (els.select && els.select.options && els.select.options.length > 0) {
+      // se non ha un valore valido, imposto l'anno corrente
+      if (!parseInt(els.select.value,10)) els.select.value = now;
+      tlog('Uso select esistente; valore='+els.select.value,'info');
+      return done(parseInt(els.select.value,10) || now);
+    }
+    // Altrimenti lo popolo io
     els.select.innerHTML = '';
     for (var i = 0; i < years.length; i++) {
       var y = years[i];
@@ -108,23 +123,23 @@
       els.select.appendChild(opt);
     }
     els.select.value = now;
-    tlog('Anni disponibili (statici): ' + years.join(', '), 'info');
+    tlog('Anni disponibili (dinamici): ' + years.join(', '), 'info');
     done(now);
   }
 
   function init(){
-    var els=ensureBar();
+    var els = ensureUI();
     populateYears(els,function(defYear){
       applyYear(defYear,els);
-      els.button.addEventListener('click',function(){ applyYear(els.select.value,els); });
-      els.select.addEventListener('change',function(){ applyYear(els.select.value,els); });
+      // Se c'è un bottone "Carica", lo uso; altrimenti solo onChange del select esistente
+      if (els.button) els.button.addEventListener('click',function(){ applyYear(els.select.value,els); });
+      if (els.select) els.select.addEventListener('change',function(){ applyYear(els.select.value,els); });
     });
   }
 
   if(!window.__singleYearInstalled){
     window.__singleYearInstalled=true;
-    if(document.readyState==='loading'){
-      document.addEventListener('DOMContentLoaded', init);
-    } else { setTimeout(init,0); }
+    if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init); }
+    else { setTimeout(init,0); }
   }
 })();
