@@ -1660,7 +1660,63 @@ document.addEventListener('keydown', (e)=>{
 </script>
 <!-- ==== /Year Selector + Cloud Adapter ==== -->
 
-<!-- === INDICATORE DI SALVATAGGIO + BLOOCCO REFRESH (patch minima, UI invariata) === -->
+<!-- === CLOUD I/O PATCH: niente download, usa Supabase via JSON === -->
+<script>
+(function(){
+  const KEY_RX = /(^|\/)(config\.ini|config\.txt|selections_\d{4}\.txt|festivi_\d{4}\.txt)$/i;
+
+  const _origFetch = window.fetch.bind(window);
+  async function cloudRead(name){
+    try{
+      const r = await _origFetch('/api/files/text/' + encodeURIComponent(name) + '?' + Date.now(), {cache:'no-store'});
+      if (r.ok){
+        const j = await r.json().catch(()=>({ok:false}));
+        if (j && j.ok) return j.text || '';
+      }
+    }catch(_){}
+    try{
+      const r2 = await _origFetch('/api/files/' + encodeURIComponent(name) + '?' + Date.now(), {cache:'no-store'});
+      if (r2.ok) return await r2.text();
+    }catch(_){}
+    return '';
+  }
+  async function cloudWrite(name, content){
+    const r = await _origFetch('/api/files/text/' + encodeURIComponent(name), {
+      method:'PUT', headers:{'Content-Type':'text/plain; charset=utf-8'}, body: content || ''
+    });
+    const j = await r.json().catch(()=>({ok:false}));
+    if(!r.ok || !j.ok) throw new Error('HTTP '+r.status);
+    return j;
+  }
+
+  window.getTextFromServer = async (name)=> cloudRead(name);
+  window.putTextToServer  = async (name,content)=> cloudWrite(name,content);
+
+  const _origFetchText = typeof window.fetchText === 'function' ? window.fetchText.bind(window) : null;
+  window.fetchText = async function(name){
+    if (KEY_RX.test(String(name))) {
+      return await cloudRead(name);
+    }
+    return _origFetchText ? await _origFetchText(name) : '';
+  };
+
+  document.addEventListener('click', function(ev){
+    const a = ev.target.closest && ev.target.closest('a[href]');
+    if(!a) return;
+    const href = a.getAttribute('href') || '';
+    if (KEY_RX.test(href)) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const term = document.getElementById('terminal');
+      if (term) { term.value += '\\n[info] Bloccato download di ' + href; term.scrollTop = term.scrollHeight; }
+      return false;
+    }
+  }, true);
+})();
+</script>
+<!-- === /CLOUD I/O PATCH === -->
+
+<!-- === INDICATORE DI SALVATAGGIO + BLOCCO REFRESH (patch minima) === -->
 <style>
   #save-indicator{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#5b6877;user-select:none}
   #save-indicator .dot{width:10px;height:10px;border-radius:50%;display:inline-block;background:#aaa}
@@ -1738,6 +1794,6 @@ document.addEventListener('keydown', (e)=>{
   window.__saveIndicator={ setDirty, setSaving, updateSaveIndicator };
 })();
 </script>
-<!-- === /INDICATORE DI SALVATAGGIO + BLOOCCO REFRESH === -->
+<!-- === /INDICATORE DI SALVATAGGIO + BLOCCO REFRESH === -->
 </body>
 </html>
