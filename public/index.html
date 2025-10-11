@@ -1516,6 +1516,21 @@ document.addEventListener('keydown', (e)=>{
 
 })();</script>
 
+<script>
+// Carica year_single_selector.js, fallback a year_single_selector.fixed.js
+(function(){
+  function loadExternal(list){
+    if(!list.length) return;
+    var s=document.createElement('script');
+    s.src=list[0]; s.defer=true;
+    s.onerror=function(){ loadExternal(list.slice(1)); };
+    document.body.appendChild(s);
+  }
+  loadExternal(['year_single_selector.js','year_single_selector.fixed.js']);
+})();
+</script>
+
+
 <!-- ==== Planny Cloud Year Selector + Cloud Adapter (non-invasivo) ==== -->
 <style>
   #cloud-year-box{display:flex;gap:6px;align-items:center;margin:6px 8px}
