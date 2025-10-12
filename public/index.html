@@ -179,7 +179,7 @@ td, th {padding: 2px 4px;}
 <script>
 (function(){
   /* ------- Logger ------- */
-  const logBuffer = []; let logFlushCursor = 0;
+  const logBuffer = [];
   function log(msg, type='info'){
     // Sempre in DevTools
     (type==='err'?console.error:type==='warn'?console.warn:console.log)(msg);
