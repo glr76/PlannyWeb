@@ -1600,14 +1600,20 @@ document.addEventListener('keydown', (e)=>{
   window.saveNow = saveNow;
 })();
 
+// Safe wrapper: works even if window.saveNow isn't ready yet
+function callSaveNowSafe(){
+  try {
+    if (typeof window.saveNow === 'function') { window.saveNow(); }
+  } catch(e){}
+}
 // Ensure immediate flush on tab hide/refresh
 window.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
-    try { saveNow(); } catch (e) {}
+    try { callSaveNowSafe(); } catch (e) {}
   }
 });
 window.addEventListener('pagehide', () => {
-  try { saveNow(); } catch (e) {}
+  try { callSaveNowSafe(); } catch (e) {}
 });
 
 </script>
