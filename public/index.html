@@ -177,6 +177,9 @@ td, th {padding: 2px 4px;}
 <datalist id="options-list"></datalist>
 
 <script>
+// cache busting versione file
+window.__fileVersion = window.__fileVersion || {};
+
 (function(){
   /* ------- Logger ------- */
 window.logBuffer = (window.logBuffer ?? []);     // unico buffer globale
@@ -301,35 +304,39 @@ function log(msg, type='info'){
   window.__fileVersion = window.__fileVersion || {};
 
 async function putTextToServer(filename, text, {timeoutMs=15000} = {}){
-  const ctrl = new AbortController();
+const ctrl = new AbortController();
   const to = setTimeout(()=>ctrl.abort('timeout'), timeoutMs);
   try{
-    const res = await fetch(`/api/files/${filename}`, {
+    if(!window.__fileVersion) window.__fileVersion = {};
+    const res = await fetch(`/api/files/text/${filename}`, {
       method: 'PUT',
       headers: {'Content-Type':'text/plain; charset=utf-8'},
       body: text,
       cache: 'no-store',
       signal: ctrl.signal
     });
-    const body = await res.text().catch(()=> '');
-    if(!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} ${body ? '- '+body : ''}`);
-    // bust per i GET successivi
-    window.__fileVersion[filename] = Date.now();
-    return body;
-  } finally { clearTimeout(to); }
+    const payload = await res.json();
+    if(!res.ok || !payload?.ok){ throw new Error(`PUT failed ${res.status}`); }
+    window.__fileVersion[filename] = payload.sha_echo || Date.now();
+    return payload;
+  } finally {
+    clearTimeout(to);
+  }
 }
   async function getTextFromServer(filename){
-  const ver = window.__fileVersion?.[filename] || Date.now();
-  const url = `/api/files/${filename}?v=${ver}`;
+if(!window.__fileVersion) window.__fileVersion = {};
+  const ver = window.__fileVersion[filename] || Date.now();
+  const url = `/api/files/text/${filename}?v=${encodeURIComponent(ver)}`;
   const res = await fetch(url, {
     cache: 'no-store',
     headers: {
-      'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate',
+      'Cache-Control':'no-cache, no-store, max-age=0, must-revalidate',
       'Pragma': 'no-cache'
     }
   });
-  if(!res.ok) throw new Error('HTTP '+res.status);
-  return res.text();
+  const payload = await res.json();
+  if(!res.ok || !payload?.ok){ throw new Error('HTTP '+res.status); }
+  return payload.text || '';
 }
 
 
@@ -936,6 +943,16 @@ async function saveNow(){
     log('Errore saveNow: '+(e && e.message || e), 'warn');
   }
 }
+// Flush immediato prima che la pagina venga nascosta/chiusa
+window.addEventListener('visibilitychange', ()=>{
+  if (document.visibilityState === 'hidden') {
+    try{ saveNow(); }catch(e){}
+  }
+});
+window.addEventListener('pagehide', ()=>{
+  try{ saveNow(); }catch(e){}
+});
+
 
 function scheduleAutoSave(delayMs = 800){
   if (__saveTimer) return; // già pianificato
@@ -1391,7 +1408,7 @@ document.addEventListener('keydown', (e)=>{
   document.getElementById('jump-today').addEventListener('click', jumpToToday);
 
   // init
-  autoLoad();
+  // $1  // disattivato: autoload disabilitato
 
   // Ascolto eventi dal selettore anno esterno
   try{
