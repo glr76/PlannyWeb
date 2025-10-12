@@ -294,31 +294,11 @@ function log(msg, type='info'){
   window.addEventListener('scroll', ()=> suggest.position(), true);
 
   /* ------- Helpers fetch/file ------- */
-  async function fetchText(path){
-    try{
-      const r=await fetch(path,{cache:'no-cache'});
-      if(!r.ok){ log(`fetchText ${path} -> HTTP ${r.status}`,'warn'); return null; }
-      return await r.text();
-    }catch(e){
-      log(`fetchText ${path} errore: ${e.message}`,'warn');
-      return null;
-    }
-  }
-
+  
   // Espongo importer selections per year_single_selector.js
   window.importSelectionsFromText = importSelectionsFromText;
   window.__SINGLE_IMPORTER = "importSelectionsFromText";
-  async function fetchJSON(url){
-    try{
-      const r=await fetch(url,{cache:'no-cache'});
-      if(!r.ok){ log(`fetchJSON ${url} -> HTTP ${r.status}`,'warn'); return null; }
-      return await r.json();
-    }catch(e){
-      log(`fetchJSON ${url} errore: ${e.message}`,'warn');
-      return null;
-    }
-  }
-
+  
   // Espongo importer selections per year_single_selector.js
   window.__fileVersion = window.__fileVersion || {};
 
@@ -481,42 +461,19 @@ async function saveSelectionsToServer(){
 
   /* ------- Festività ------- */
   async function loadHolidaysFromLocalOrWeb(){
-    const fname = `festivi_${state.year}.txt`;
-    try{
-      const txt = await getTextFromServer(fname) || await fetchText(fname);
-      if (txt){
-        const set = new Set();
-        txt.split(/\r?\n/).forEach(line=>{
-          const t=line.trim();
-          if(!t || t.startsWith('#')) return;
-          if(/^\d{2}-\d{2}-\d{4}$/.test(t)) set.add(t);
-        });
-        state.holidays = set;
-        log(`Festivi caricati da ${fname}: ${set.size} date`,'ok');
-        return;
-      }
-    }catch(_){}
+  const fname = `festivi_${state.year}.txt`;
+  const txt = await getTextFromServer(fname); // 👈 nessun fallback a fetchText
 
-    log('Festivi non trovati: scarico dal web…','warn');
-    const url = `https://date.nager.at/api/v3/PublicHolidays/${state.year}/IT`;
-    const data = await fetchJSON(url);
-    if (Array.isArray(data) && data.length){
-      const set = new Set(); const lines = [];
-      data.forEach(item=>{
-        const d = (item.date||'').split('-'); // YYYY-MM-DD
-        if(d.length===3){ const s = `${d[2]}-${d[1]}-${d[0]}`; set.add(s); lines.push(s); }
-      });
-      if(set.size){
-        state.holidays = set;
-        log('Festivi ottenuti dal web: '+set.size,'ok');
-        await saveFestiviToServer(state.year, lines);
-        return;
-      }
-    }
+  const set = new Set();
+  txt.split(/\r?\n/).forEach(line=>{
+    const t=line.trim();
+    if(!t || t.startsWith('#')) return;
+    if(/^\d{2}-\d{2}-\d{4}$/.test(t)) set.add(t);
+  });
+  state.holidays = set;
+  log(`Festivi caricati da ${fname}: ${set.size} date`,'ok');
+}
 
-    state.holidays = italianHolidays(state.year);
-    log(`Impossibile scaricare i festivi: uso calcolo automatico (${state.holidays.size} date).`,'warn');
-  }
   function easterDate(y){
     const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4;
     const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
@@ -557,33 +514,7 @@ async function saveSelectionsToServer(){
 
   // Espongo importer selections per year_single_selector.js
   window.importSelectionsFromText = importSelectionsFromText;
-  let _festiviRetryTimer = null;
-  async function retryFestiviQueue(){
-    let q = [];
-    try{ q = JSON.parse(localStorage.getItem('pendingFestivi') || '[]'); }catch(_){ q = []; }
-    if(!q.length) return;
-    const next = [];
-    for(const item of q){
-      try{
-        const r = await fetch(`/api/files/${encodeURIComponent(item.name)}`, {
-          method: 'PUT',
-          headers: {'Content-Type':'text/plain;charset=utf-8'},
-          body: item.payload
-        });
-        if(!r.ok) throw new Error('HTTP ' + r.status);
-        log('Festivi (retry) salvati: ' + item.name, 'ok');
-      }catch(e){
-        next.push(item);
-      }
-    }
-    localStorage.setItem('pendingFestivi', JSON.stringify(next));
-    if(next.length){ scheduleFestiviRetry(5000); }
-  }
-  function scheduleFestiviRetry(delay){
-    clearTimeout(_festiviRetryTimer);
-    _festiviRetryTimer = setTimeout(retryFestiviQueue, delay || 0);
-  }
-  scheduleFestiviRetry(2000);
+  
   // Espongo per script esterni
   window.loadHolidaysFromLocalOrWeb = loadHolidaysFromLocalOrWeb;
 
@@ -1442,7 +1373,7 @@ document.addEventListener('keydown', (e)=>{
     if(location.protocol==='file:') log('Aperto via file:// – usa il server Flask per salvataggi automatici.','warn');
 
     try{
-      const cfg=await getTextFromServer('config.ini') || await fetchText('config.ini');
+      const cfg=await getTextFromServer('config.ini');
       if(cfg){
         const ini=parseIni(cfg);
         if(ini['Anno']?.['year']) $('#year').value=ini['Anno']['year'];
@@ -1450,7 +1381,7 @@ document.addEventListener('keydown', (e)=>{
         if(ini['Linac']?.['options']) $('#options').value=ini['Linac']['options'];
       }
       if(!$('#year').value){
-        const cfgTxt = await getTextFromServer('config.txt') || await fetchText('config.txt');
+        const cfgTxt = await getTextFromServer('config.txt');
         if(cfgTxt){
           const y = parseYearFromConfigTxt(cfgTxt);
           if(y){ $('#year').value = y; log('Anno letto da config.txt: '+y,'ok'); }
@@ -1464,12 +1395,9 @@ document.addEventListener('keydown', (e)=>{
       await loadHolidaysFromLocalOrWeb();
 
       const selName = selectionsFileName();
-      const selTxt = await getTextFromServer(selName) || await fetchText(selName);
+      const selTxt = await getTextFromServer(selName);
       if(selTxt){ importSelectionsFromText(selTxt); log('Caricato '+selName,'ok'); }
-      else {
-        let ls=''; try{ ls = localStorage.getItem('selections_'+state.year) || ''; }catch(_){ ls=''; }
-        if(ls){ importSelectionsFromText(ls); log('Selections caricati da backup locale (localStorage).','ok'); }
-        else { log('Nessun selections trovato: userò '+selName+' per i salvataggi.','warn'); }
+		else { log('Nessun selections trovato su server: '+selName,'warn'); }
       }
 
       save.selName = selName;
