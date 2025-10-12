@@ -177,6 +177,9 @@ td, th {padding: 2px 4px;}
 <datalist id="options-list"></datalist>
 
 <script>
+// global stub to avoid ReferenceError before real saveNow is exported
+window.saveNow = window.saveNow || function(){};
+
 (function(){
   /* ------- Logger ------- */
 window.logBuffer = (window.logBuffer ?? []);     // unico buffer globale
@@ -1600,22 +1603,23 @@ document.addEventListener('keydown', (e)=>{
   window.saveNow = saveNow;
 })();
 
-// Safe wrapper: works even if window.saveNow isn't ready yet
-function callSaveNowSafe(){
-  try {
-    if (typeof window.saveNow === 'function') { window.saveNow(); }
-  } catch(e){}
-}
 // Ensure immediate flush on tab hide/refresh
 window.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
-    try { callSaveNowSafe(); } catch (e) {}
+    try { saveNow(); } catch (e) {}
   }
 });
 window.addEventListener('pagehide', () => {
   try { callSaveNowSafe(); } catch (e) {}
 });
 
+
+// safe wrapper (works even if window.saveNow isn't ready yet)
+function callSaveNowSafe(){
+  try {
+    if (typeof window.saveNow === 'function') { window.saveNow(); }
+  } catch(e){}
+}
 </script>
 
 </body>
