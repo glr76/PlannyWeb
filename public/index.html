@@ -177,9 +177,6 @@ td, th {padding: 2px 4px;}
 <datalist id="options-list"></datalist>
 
 <script>
-// cache busting versione file
-window.__fileVersion = window.__fileVersion || {};
-
 (function(){
   /* ------- Logger ------- */
 window.logBuffer = (window.logBuffer ?? []);     // unico buffer globale
@@ -303,39 +300,43 @@ function log(msg, type='info'){
   // Espongo importer selections per year_single_selector.js
   window.__fileVersion = window.__fileVersion || {};
 
-async function putTextToServer(filename, text, {timeoutMs=15000} = {}){
-const ctrl = new AbortController();
-  const to = setTimeout(()=>ctrl.abort('timeout'), timeoutMs);
-  try{
-    if(!window.__fileVersion) window.__fileVersion = {};
+async function putTextToServer(filename, text, {timeoutMs=15000} = {}) {
+  window.__fileVersion = window.__fileVersion || {};
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort('timeout'), timeoutMs);
+  try {
     const res = await fetch(`/api/files/text/${filename}`, {
       method: 'PUT',
-      headers: {'Content-Type':'text/plain; charset=utf-8'},
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
       body: text,
       cache: 'no-store',
       signal: ctrl.signal
     });
     const payload = await res.json();
-    if(!res.ok || !payload?.ok){ throw new Error(`PUT failed ${res.status}`); }
+    if (!res.ok || !payload?.ok)
+      throw new Error(`PUT failed ${res.status}`);
+    // salva hash per cache busting
     window.__fileVersion[filename] = payload.sha_echo || Date.now();
     return payload;
   } finally {
     clearTimeout(to);
   }
 }
-  async function getTextFromServer(filename){
-if(!window.__fileVersion) window.__fileVersion = {};
-  const ver = window.__fileVersion[filename] || Date.now();
-  const url = `/api/files/text/${filename}?v=${encodeURIComponent(ver)}`;
+
+async function getTextFromServer(filename) {
+  window.__fileVersion = window.__fileVersion || {};
+  const ver = window.__fileVersion?.[filename] || Date.now();
+  const url = `/api/files/text/${filename}?v=${ver}`;
   const res = await fetch(url, {
     cache: 'no-store',
     headers: {
-      'Cache-Control':'no-cache, no-store, max-age=0, must-revalidate',
+      'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate',
       'Pragma': 'no-cache'
     }
   });
   const payload = await res.json();
-  if(!res.ok || !payload?.ok){ throw new Error('HTTP '+res.status); }
+  if (!res.ok || !payload?.ok)
+    throw new Error('HTTP ' + res.status);
   return payload.text || '';
 }
 
@@ -943,16 +944,6 @@ async function saveNow(){
     log('Errore saveNow: '+(e && e.message || e), 'warn');
   }
 }
-// Flush immediato prima che la pagina venga nascosta/chiusa
-window.addEventListener('visibilitychange', ()=>{
-  if (document.visibilityState === 'hidden') {
-    try{ saveNow(); }catch(e){}
-  }
-});
-window.addEventListener('pagehide', ()=>{
-  try{ saveNow(); }catch(e){}
-});
-
 
 function scheduleAutoSave(delayMs = 800){
   if (__saveTimer) return; // già pianificato
@@ -1408,7 +1399,7 @@ document.addEventListener('keydown', (e)=>{
   document.getElementById('jump-today').addEventListener('click', jumpToToday);
 
   // init
-  // $1  // disattivato: autoload disabilitato
+  //autoLoad();
 
   // Ascolto eventi dal selettore anno esterno
   try{
@@ -1610,6 +1601,17 @@ document.addEventListener('keydown', (e)=>{
 
   window.__SaveTracker = SaveTracker;
 })();
+// Ensure immediate flush on tab hide/refresh
+window.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    try { saveNow(); } catch (e) {}
+  }
+});
+
+window.addEventListener('pagehide', () => {
+  try { saveNow(); } catch (e) {}
+});
+
 </script>
 
 </body>
