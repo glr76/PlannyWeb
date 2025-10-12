@@ -2,10 +2,10 @@
 import os
 import logging
 import traceback
-from flask import Flask, request, send_from_directory, Response, jsonify, abort
+from flask import Flask, request, send_from_directory, Response, jsonify, abort, make_response
 from flask_cors import CORS
 from supabase import create_client, Client
-
+from hashlib import sha256  
 # ----------------------------------------------------
 # Config
 # ----------------------------------------------------
@@ -141,6 +141,8 @@ def api_read_text_legacy(name: str):
             return Response("", status=404, mimetype="text/plain; charset=utf-8")
         headers = {
             "Cache-Control": "no-store, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
             "X-Content-Type-Options": "nosniff",
             "Content-Disposition": f'inline; filename="{os.path.basename(fname)}"',
         }
