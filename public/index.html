@@ -334,21 +334,15 @@ async function putTextToServer(filename, text, {timeoutMs=15000} = {}){
       signal: ctrl.signal
     });
     const body = await res.text().catch(()=> '');
-    if (!res.ok){
-      throw new Error(`HTTP ${res.status} ${res.statusText} ${body ? '- '+body : ''}`);
-    }
-    // 👇 aggiorna la “versione” per forzare i GET successivi
+    if(!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} ${body ? '- '+body : ''}`);
+    // bust per i GET successivi
     window.__fileVersion[filename] = Date.now();
-    try{ log(`PUT OK ${filename}: ${body||'OK'}`, 'ok'); }catch(_){}
     return body;
-  }catch(err){
-    try{ log(`PUT FAIL ${filename}: ${err && err.message || err}`, 'error'); }catch(_){}
-    throw err;
-  }finally{ clearTimeout(to); }
+  } finally { clearTimeout(to); }
 }
   async function getTextFromServer(filename){
-  const ver = (window.__fileVersion && window.__fileVersion[filename]) ? window.__fileVersion[filename] : Date.now();
-  const url = `/api/files/${filename}?v=${ver}`;     // 👈 URL unico per saltare la cache
+  const ver = window.__fileVersion?.[filename] || Date.now();
+  const url = `/api/files/${filename}?v=${ver}`;
   const res = await fetch(url, {
     cache: 'no-store',
     headers: {
@@ -359,6 +353,7 @@ async function putTextToServer(filename, text, {timeoutMs=15000} = {}){
   if(!res.ok) throw new Error('HTTP '+res.status);
   return res.text();
 }
+
   function downloadTextFile(name, text){
     const a=document.createElement('a');
     a.href=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));
@@ -461,33 +456,24 @@ async function appendLogsToServer(opts={force:false}){
 
 async function saveSelectionsToServer(){
   const name = selectionsFileName();
-  if (window.__saveInFlight){ window.__saveQueued = true; return; }
-  window.__saveInFlight = true;
-
+  if (__saveInFlight){ __saveQueued = true; return; }
+  __saveInFlight = true;
   const taskId = `selections:${name}:${Date.now()}`;
   __SaveTracker.start(taskId);
-
   try{
-    const textRaw = selectionsToText();
-    const text = normSelectionsText(textRaw) + '\n';
+    const text = normSelectionsText(selectionsToText()) + '\n';
     await putTextToServer(name, text);
-    try{ localStorage.setItem('selections_'+state.year, text); }catch(_){}
     log('Selections salvati su server: '+name, 'ok');
     __SaveTracker.ok(taskId);
   }catch(err){
     __SaveTracker.fail(taskId, err);
-    log('Server non disponibile per selections (download locale): '+(err && err.message || err),'warn');
-    const text = selectionsToText();
-    try{ localStorage.setItem('selections_'+state.year, text); }catch(_){}
-    downloadTextFile(name, text);
+    throw err; // niente fallback: fallisce visibilmente
   }finally{
-    window.__saveInFlight = false;
-    if (window.__saveQueued){
-      window.__saveQueued = false;
-      scheduleAutoSave(300);
-    }
+    __saveInFlight = false;
+    if (__saveQueued){ __saveQueued = false; scheduleAutoSave(300); }
   }
 }
+
 
 
   // Espongo importer selections per year_single_selector.js
