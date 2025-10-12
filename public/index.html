@@ -1623,16 +1623,14 @@ document.addEventListener('keydown', (e)=>{
 <!-- ==== /Year Selector + Cloud Adapter ==== -->
 <script>
 /* ==========================================================
-   SaveTracker: spia salvataggi + blocco refresh
-   - Intercetta TUTTI i fetch PUT verso /api/files/... e /api/files/text/...
-   - Mostra badge in alto a destra:
-       🟠 "Salvataggio in corso..." quando esistono PUT pendenti
-       🟢 "Tutto salvato" quando la coda è vuota
-   - Impedisce refresh/chiusura (beforeunload) finché ci sono salvataggi attivi
+   SaveTracker v2 — spia salvataggi + blocco refresh
+   Copre:
+     - debounce in attesa (__saveTimer del tuo autosave)
+     - coalescing in corso (__saveInFlight / __saveQueued)
+     - fetch PUT attivi verso /api/files/... e /api/files/text/...
    ========================================================== */
-
 (function(){
-  // --- Badge UI
+  // --- Badge UI -------------------------------------------------
   const badge = document.createElement('div');
   badge.id = 'save-indicator';
   badge.style.cssText = `
@@ -1647,38 +1645,40 @@ document.addEventListener('keydown', (e)=>{
     background: #14532d; /* verde */
     color: #dcfce7;
     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    transition: background .25s, color .25s, opacity .25s;
+    transition: background .2s, color .2s, opacity .2s;
     opacity: .95;
     pointer-events: none;
   `;
   badge.textContent = '🟢 Tutto salvato';
-  document.addEventListener('DOMContentLoaded', () => document.body.appendChild(badge));
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => document.body.appendChild(badge));
+  } else {
+    document.body.appendChild(badge);
+  }
 
-  // --- Stato e utilità
+  // --- Stato tracker --------------------------------------------
   const SaveTracker = {
-    active: 0,
+    activeFetch: 0,        // PUT in corso (rete)
     match(url, method){
       if (!method || method.toUpperCase() !== 'PUT') return false;
       try{
         const u = new URL(url, location.href);
         return u.pathname.startsWith('/api/files/') || u.pathname.startsWith('/api/files/text/');
       }catch(_){
-        // url relativo semplice
         return (typeof url === 'string')
-          && url.startsWith('/api/files/')
-          || url.startsWith('/api/files/text/');
+          && (url.startsWith('/api/files/') || url.startsWith('/api/files/text/'));
       }
     },
-    inc(){
-      this.active++;
-      this.render();
-    },
-    dec(){
-      if (this.active > 0) this.active--;
-      this.render();
+    // Stato "pending" completo: include debounce/flags del tuo autosave
+    isPending(){
+      const inFlight   = !!(window.__saveInFlight);
+      const queued     = !!(window.__saveQueued);
+      const debounce   = !!(window.__saveTimer); // timer non nullo => save pianificato
+      const netActive  = this.activeFetch > 0;
+      return inFlight || queued || debounce || netActive;
     },
     render(){
-      if (this.active > 0){
+      if (this.isPending()){
         badge.textContent = '🟠 Salvataggio in corso...';
         badge.style.background = '#b45309';   // arancione
         badge.style.color = '#fff7ed';
@@ -1690,26 +1690,32 @@ document.addEventListener('keydown', (e)=>{
     }
   };
 
-  // --- Patch globale di fetch (conta PUT verso /api/files...)
+  // --- Patch fetch: conta i PUT verso /api/files... -------------
   const _origFetch = window.fetch;
   window.fetch = async function(input, init){
     const method = (init && init.method) || (input && input.method) || 'GET';
     const url = (typeof input === 'string') ? input : (input && input.url);
-
     const track = SaveTracker.match(url, method);
-    if (track) SaveTracker.inc();
+
+    if (track) { SaveTracker.activeFetch++; SaveTracker.render(); }
 
     try{
       const res = await _origFetch.apply(this, arguments);
+      // NB: il server tuo risponde solo dopo l'upload completato;
+      // quando arriviamo qui, il PUT è stato gestito lato server.
       return res;
     } finally {
-      if (track) SaveTracker.dec();
+      if (track) { SaveTracker.activeFetch--; SaveTracker.render(); }
     }
   };
 
-  // --- Blocca refresh/chiusura mentre ci sono salvataggi attivi
+  // --- Poll leggero: segue anche __saveTimer/Queued/Inflight ----
+  // (utile perché quei flag cambiano senza passare da fetch)
+  setInterval(()=> SaveTracker.render(), 200);
+
+  // --- Blocca refresh/chiusura quando c'è pending ----------------
   window.addEventListener('beforeunload', (e) => {
-    if (SaveTracker.active > 0){
+    if (SaveTracker.isPending()){
       const msg = 'Sono in corso salvataggi. Attendere prima di chiudere o ricaricare.';
       e.preventDefault();
       e.returnValue = msg; // per alcuni browser
@@ -1717,7 +1723,7 @@ document.addEventListener('keydown', (e)=>{
     }
   });
 
-  // --- API opzionale: se vuoi contare manualmente operazioni custom
+  // Espone per debug (opzionale)
   window.__SaveTracker = SaveTracker;
 })();
 </script>
