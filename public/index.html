@@ -1374,11 +1374,7 @@ document.addEventListener('keydown', (e)=>{
       const selTxt = await getTextFromServer(selName);
       if(selTxt){ importSelectionsFromText(selTxt); log('Caricato '+selName,'ok'); }
 		else { log('Nessun selections trovato su server: '+selName,'warn'); }
-		}catch(e){
-      log('Errore in autoload: '+e.message,'err');
-    }
-      }
-
+  
       save.selName = selName;
       save.logName = 'planny_log_'+state.year+'.txt';
 
