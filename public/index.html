@@ -327,34 +327,172 @@ td, th {padding: 2px 4px;}
   const ctrl = new AbortController();
   const to = setTimeout(()=>ctrl.abort('timeout'), timeoutMs);
   try{
-    const url = `/api/files/text/${encodeURIComponent(filename)}`;
-    const res = await fetch(url, {
+    const res = await fetch(`/api/files/${filename}`, {
       method: 'PUT',
       headers: {'Content-Type':'text/plain; charset=utf-8'},
       body: text,
       cache: 'no-store',
       signal: ctrl.signal
     });
-    let data = null;
-    try { data = await res.json(); }
-    catch(parseErr){
-      const raw = await res.text().catch(()=> '');
-      throw new Error(`PUT parse error ${res.status}: ${raw||'(empty)'}`);
+    const body = await res.text().catch(()=> '');
+    if (!res.ok){
+      throw new Error(`HTTP ${res.status} ${res.statusText} ${body ? '- '+body : ''}`);
     }
-    if (!res.ok || !data || data.ok !== true){
-      const why = (data && (data.error || JSON.stringify(data))) || res.statusText;
-      throw new Error(`PUT failed ${res.status}: ${why}`);
-    }
-    try{ log(`PUT OK ${filename} (json): size=${data.size}`, 'ok'); }catch(_){}
-    return data;
-  } catch(err){
+    try{ log(`PUT OK ${filename}: ${body||'OK'}`, 'ok'); }catch(_){}
+    return body;
+  }catch(err){
     try{ log(`PUT FAIL ${filename}: ${err && err.message || err}`, 'error'); }catch(_){}
     throw err;
-  } finally {
+  }finally{
     clearTimeout(to);
   }
 }
-// Espongo importer selections per year_single_selector.js
+  async function getTextFromServer(name){
+    const r = await fetch(`/api/files/${encodeURIComponent(name)}`);
+    if(r.status===404) return null;
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.text();
+  }
+  function downloadTextFile(name, text){
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));
+    a.download=name; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),0);
+  }
+
+  /* ------- Parser INI & colonne ------- */
+  function parseIni(text){
+    const out={}; let section=null;
+    text.split(/\r?\n/).forEach(raw=>{
+      const line=raw.trim(); if(!line || line.startsWith(';') || line.startsWith('#')) return;
+      const m=line.match(/^\[(.+?)\]$/);
+      if(m){ section=m[1]; out[section]=out[section]||{}; return; }
+      const kv=line.split('='); if(kv.length>=2){ const k=kv.shift().trim(); const v=kv.join('=').trim().replace(/^"|"$/g,''); (section?out[section]:out)[k]=v; }
+    });
+    return out;
+  }
+  function parseTabellaIni(text){
+    return text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean).filter(x=>x.toLowerCase()!=='data');
+  }
+  function getColumns(){ return state.names || []; }
+
+  /* ------- Log ------- */
+  function logsChunkSinceCursor(){
+    if(logFlushCursor>=logBuffer.length) return '';
+    const chunk = logBuffer.slice(logFlushCursor).join('\n') + '\n';
+    logFlushCursor = logBuffer.length;
+    return chunk;
+  }
+  let logFlushCursor = window.logFlushCursor || 0;
+let logBuffer = window.logBuffer || []; // log(...) pusha qui le righe
+
+function logsChunkSinceCursor(){
+  if (logFlushCursor >= logBuffer.length) return '';
+  const chunk = logBuffer.slice(logFlushCursor).join('\n') + '\n';
+  logFlushCursor = logBuffer.length;
+  return chunk;
+}
+function logCacheKey(year){ return `log_cache_${year}`; }
+
+async function appendLogsToServer(opts={force:false}){
+  const year = state.year;
+  const name = `planny_log_${year}.txt`;
+
+  let chunk = logsChunkSinceCursor();
+  if (!chunk && opts.force){
+    chunk = `[${new Date().toLocaleString()}] Sessione avviata su ${location.href}\n`;
+  }
+  if (!chunk) return;
+
+  let prev = '';
+  try { prev = localStorage.getItem(logCacheKey(year)) || ''; } catch(_) {}
+  const merged = (prev + chunk).replace(/\r\n/g,'\n');
+
+  const taskId = `log:${name}:${Date.now()}`;
+  __SaveTracker.start(taskId);
+
+  try{
+    await putTextToServer(name, merged);
+    try { localStorage.setItem(logCacheKey(year), merged); } catch(_){}
+    log('Log aggiornato (PUT) su server: '+name, 'ok');
+    __SaveTracker.ok(taskId);
+  }catch(err){
+    __SaveTracker.fail(taskId, err);
+    log('Impossibile aggiornare il log via PUT: '+(err && err.message || err), 'warn');
+    try { localStorage.setItem(logCacheKey(year), merged); } catch(_){}
+  }
+}
+
+  // Espongo importer selections per year_single_selector.js
+  window.importSelectionsFromText = importSelectionsFromText;
+
+  /* ------- Config helpers ------- */
+  function parseYearFromConfigTxt(text){
+    let year=null;
+    text.split(/\r?\n/).forEach(line=>{
+      const t=line.trim();
+      if(!t || t.startsWith('#') || t.startsWith('//')) return;
+      const m = t.match(/^\s*(ANNO|YEAR|ANNO_CALENDARIO)\s*[:=]\s*(\d{4})\s*$/i);
+      if(m){ year = parseInt(m[2],10); }
+    });
+    return year;
+  }
+
+  /* ------- Selections (file) ------- */
+  function selectionsFileName(){ return `selections_${state.year}.txt`; }
+  function selectionsToText(){
+    const entries=[...state.selections.entries()].map(([k,v])=>({k,v,del:false}));
+    const dels=[...state.deletions].map(k=>({k,v:'__DEL__',del:true}));
+    const all = entries.concat(dels);
+    all.sort((a,b)=>{
+      const [ad,an]=a.k.split(','),[bd,bn]=b.k.split(',');
+      const pa=ad.split('-').reverse().join(''), pb=bd.split('-').reverse().join('');
+      const s = pa!==pb?pa.localeCompare(pb):an.localeCompare(bn);
+      if(s!==0) return s;
+      // A parità di chiave, scrivi prima i valori poi le DEL? Meglio DEL dopo per prevalere.
+      return (a.del===b.del)?0:(a.del?1:-1);
+    });
+    return all.map(o=>o.k+','+o.v).join('\n')+'\n';
+  }
+  function normSelectionsText(s){
+  return String(s||'')
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+$/gm, '')
+    .trim();
+}
+
+async function saveSelectionsToServer(){
+  const name = selectionsFileName();
+  if (window.__saveInFlight){ window.__saveQueued = true; return; }
+  window.__saveInFlight = true;
+
+  const taskId = `selections:${name}:${Date.now()}`;
+  __SaveTracker.start(taskId);
+
+  try{
+    const textRaw = selectionsToText();
+    const text = normSelectionsText(textRaw) + '\n';
+    await putTextToServer(name, text);
+    try{ localStorage.setItem('selections_'+state.year, text); }catch(_){}
+    log('Selections salvati su server: '+name, 'ok');
+    __SaveTracker.ok(taskId);
+  }catch(err){
+    __SaveTracker.fail(taskId, err);
+    log('Server non disponibile per selections (download locale): '+(err && err.message || err),'warn');
+    const text = selectionsToText();
+    try{ localStorage.setItem('selections_'+state.year, text); }catch(_){}
+    downloadTextFile(name, text);
+  }finally{
+    window.__saveInFlight = false;
+    if (window.__saveQueued){
+      window.__saveQueued = false;
+      scheduleAutoSave(300);
+    }
+  }
+}
+
+
+  // Espongo importer selections per year_single_selector.js
   window.importSelectionsFromText = importSelectionsFromText;
 
   /* ------- Festività ------- */
@@ -916,7 +1054,6 @@ function normSelectionsText(s){
     .trim();
 }
 
-
 /* ------- AutoSave (debounce + coalescing) ------- */
 async function saveNow(){
   try{
@@ -927,7 +1064,17 @@ async function saveNow(){
   }
 }
 
-/* ======== SELEZIONE + COPY/PASTE ======== */
+function scheduleAutoSave(delayMs = 800){
+  if (__saveTimer) return; // già pianificato
+  __saveTimer = setTimeout(async ()=>{
+    __saveTimer = null;
+    await saveSelectionsToServer();
+    await appendLogsToServer();
+  }, delayMs);
+}
+
+
+  /* ======== SELEZIONE + COPY/PASTE ======== */
   function clearSelection(){
     state.selected.forEach(td=>td.classList.remove('selected'));
     state.selected.clear();
@@ -1525,7 +1672,7 @@ document.addEventListener('keydown', (e)=>{
    SaveTracker v3 (esplicito)
    - stati: pending (🟠), ok (🟢), error (🔴)
    - tiene conto di: debounce (__saveTimer), coalescing (__saveInFlight/__saveQueued)
-   - conta SOLO i salvataggi espliciti (selections/log) via __SaveTracker API
+   - conta SOLO i salvataggi che indichiamo (selections/log)
    ============================== */
 (function(){
   const badge = document.createElement('div');
@@ -1533,7 +1680,7 @@ document.addEventListener('keydown', (e)=>{
   badge.style.cssText = `
     position: fixed; top:10px; right:14px; z-index:9999;
     padding:8px 14px; border-radius:12px; font-weight:600;
-    font-family: system-ui, sans-serif; box-shadow:0 2px 8px rgba(0,0,0,.15);
+    font-family: system-ui, sans-serif; box-shadow:0 2px 8px rgba(0,0,0,0.15);
     background:#14532d; color:#dcfce7; transition: background .2s, color .2s, opacity .2s; opacity:.95; pointer-events:none;
   `;
   badge.textContent = '🟢 Tutto salvato';
@@ -1583,5 +1730,6 @@ document.addEventListener('keydown', (e)=>{
   window.__SaveTracker = SaveTracker;
 })();
 </script>
+
 </body>
 </html>
