@@ -320,8 +320,9 @@ function log(msg, type='info'){
   }
 
   // Espongo importer selections per year_single_selector.js
-  window.importSelectionsFromText = importSelectionsFromText;
-  async function putTextToServer(filename, text, {timeoutMs=15000} = {}){
+  window.__fileVersion = window.__fileVersion || {};
+
+async function putTextToServer(filename, text, {timeoutMs=15000} = {}){
   const ctrl = new AbortController();
   const to = setTimeout(()=>ctrl.abort('timeout'), timeoutMs);
   try{
@@ -336,21 +337,28 @@ function log(msg, type='info'){
     if (!res.ok){
       throw new Error(`HTTP ${res.status} ${res.statusText} ${body ? '- '+body : ''}`);
     }
+    // 👇 aggiorna la “versione” per forzare i GET successivi
+    window.__fileVersion[filename] = Date.now();
     try{ log(`PUT OK ${filename}: ${body||'OK'}`, 'ok'); }catch(_){}
     return body;
   }catch(err){
     try{ log(`PUT FAIL ${filename}: ${err && err.message || err}`, 'error'); }catch(_){}
     throw err;
-  }finally{
-    clearTimeout(to);
-  }
+  }finally{ clearTimeout(to); }
 }
-  async function getTextFromServer(name){
-    const r = await fetch(`/api/files/${encodeURIComponent(name)}`);
-    if(r.status===404) return null;
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    return r.text();
-  }
+  async function getTextFromServer(filename){
+  const ver = (window.__fileVersion && window.__fileVersion[filename]) ? window.__fileVersion[filename] : Date.now();
+  const url = `/api/files/${filename}?v=${ver}`;     // 👈 URL unico per saltare la cache
+  const res = await fetch(url, {
+    cache: 'no-store',
+    headers: {
+      'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate',
+      'Pragma': 'no-cache'
+    }
+  });
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  return res.text();
+}
   function downloadTextFile(name, text){
     const a=document.createElement('a');
     a.href=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));
