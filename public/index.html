@@ -377,12 +377,7 @@ td, th {padding: 2px 4px;}
   function getColumns(){ return state.names || []; }
 
   /* ------- Log ------- */
-  function logsChunkSinceCursor(){
-    if(logFlushCursor>=logBuffer.length) return '';
-    const chunk = logBuffer.slice(logFlushCursor).join('\n') + '\n';
-    logFlushCursor = logBuffer.length;
-    return chunk;
-  }
+  
   let logFlushCursor = window.logFlushCursor || 0;
 let logBuffer = window.logBuffer || []; // log(...) pusha qui le righe
 
