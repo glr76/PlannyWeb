@@ -1,11 +1,14 @@
 # server_supabase.py
 import os
+import io
 import logging
 import traceback
+from hashlib import sha256
+
 from flask import Flask, request, send_from_directory, Response, jsonify, abort, make_response
 from flask_cors import CORS
 from supabase import create_client, Client
-from hashlib import sha256  
+
 # ----------------------------------------------------
 # Config
 # ----------------------------------------------------
@@ -55,25 +58,45 @@ def _download_text(path: str) -> str:
 
 
 def _upload_text(path: str, content: str):
-    data = content.encode("utf-8")
-    # 1) tenta UPDATE
+    """
+    Scrive il file assicurando metadata anti-cache nel bucket.
+    Tenta update; se fallisce, fa upload (creazione).
+    """
+    data_bytes = content.encode("utf-8")
+    file_opts = {
+        "contentType": "text/plain; charset=utf-8",
+        # molte versioni di supabase-py accettano 'upsert' e 'cacheControl' qui
+        "upsert": True,
+        "cacheControl": "no-store",
+    }
+
+    # 1) Tenta UPDATE (se esiste già)
     try:
-        supabase.storage.from_(BUCKET).update(path, data)
+        # alcune versioni consentono opzioni anche su update; se non supportato non è fatale
+        supabase.storage.from_(BUCKET).update(path, data_bytes, file_opts)  # type: ignore[arg-type]
         return
     except Exception as e:
         log.info(f"[update] miss '{path}' -> try upload: {e}")
-    # 2) fallback UPLOAD (crea)
+
+    # 2) Fallback: UPLOAD (crea o sovrascrive con upsert=True)
     try:
-        # alcune versioni supportano "upsert": True
-        supabase.storage.from_(BUCKET).upload(
-            path,
-            data,
-            {"contentType": "text/plain; charset=utf-8"},
-        )
+        supabase.storage.from_(BUCKET).upload(path, data_bytes, file_opts)  # type: ignore[arg-type]
         return
     except Exception as e:
         log.error(f"[upload] fail '{path}': {e}\n{traceback.format_exc()}")
         raise
+
+
+def _nocache_headers(extra: dict | None = None) -> dict:
+    h = {
+        "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+        "X-Content-Type-Options": "nosniff",
+    }
+    if extra:
+        h.update(extra)
+    return h
 
 
 # ----------------------------------------------------
@@ -85,10 +108,11 @@ def api_text_get(name: str):
         fname = _sanitize(name)
         txt = _download_text(fname)
         status = 200 if txt != "" else 404
-        resp = make_response(jsonify(ok=(status==200), name=fname, text=txt), status)
-        resp.headers["Cache-Control"] = "no-store, max-age=0"
-        resp.headers["Pragma"] = "no-cache"
-        resp.headers["Expires"] = "0"
+        etag = sha256((txt or "").encode("utf-8")).hexdigest()
+        headers = _nocache_headers({"ETag": f'W/"{etag}"'})
+        resp = make_response(jsonify(ok=(status == 200), name=fname, text=txt), status)
+        for k, v in headers.items():
+            resp.headers[k] = v
         return resp
     except Exception as e:
         log.error(f"[GET json] '{name}': {e}\n{traceback.format_exc()}")
@@ -107,7 +131,7 @@ def api_text_put(name: str):
         # 2) rileggi subito dal bucket (sorgente-verità)
         echoed = _download_text(fname)
 
-        # 3) prepara risposta JSON con echo e SHA per debug
+        # 3) risposta JSON con echo e SHA per verifica forte
         payload = {
             "ok": True,
             "name": fname,
@@ -117,11 +141,11 @@ def api_text_put(name: str):
             "sha_echo": sha256((echoed or "").encode("utf-8")).hexdigest(),
         }
 
-        # 4) headers no-cache per evitare qualsiasi caching
+        # 4) headers no-cache anche sulla risposta PUT
+        headers = _nocache_headers({"ETag": f'W/"{payload["sha_echo"]}"'})
         resp = make_response(jsonify(payload), 200)
-        resp.headers["Cache-Control"] = "no-store, max-age=0"
-        resp.headers["Pragma"] = "no-cache"
-        resp.headers["Expires"] = "0"
+        for k, v in headers.items():
+            resp.headers[k] = v
         return resp
 
     except Exception as e:
@@ -138,18 +162,22 @@ def api_read_text_legacy(name: str):
         fname = _sanitize(name)
         txt = _download_text(fname)
         if txt == "":
-            return Response("", status=404, mimetype="text/plain; charset=utf-8")
-        headers = {
-            "Cache-Control": "no-store, max-age=0",
-            "Pragma": "no-cache",
-            "Expires": "0",
-            "X-Content-Type-Options": "nosniff",
+            # anche 404 deve avere no-cache
+            return Response(
+                "",
+                status=404,
+                mimetype="text/plain; charset=utf-8",
+                headers=_nocache_headers(),
+            )
+        etag = sha256(txt.encode("utf-8")).hexdigest()
+        headers = _nocache_headers({
+            "ETag": f'W/"{etag}"',
             "Content-Disposition": f'inline; filename="{os.path.basename(fname)}"',
-        }
+        })
         return Response(txt, mimetype="text/plain; charset=utf-8", headers=headers)
     except Exception as e:
         log.error(f"[GET legacy] '{name}': {e}\n{traceback.format_exc()}")
-        return Response("error", status=500, mimetype="text/plain; charset=utf-8")
+        return Response("error", status=500, mimetype="text/plain; charset=utf-8", headers=_nocache_headers())
 
 
 @app.put("/api/files/<path:name>")
@@ -158,7 +186,19 @@ def api_write_text_legacy(name: str):
         fname = _sanitize(name)
         raw = request.get_data(as_text=True) or ""
         _upload_text(fname, raw)
-        return jsonify(ok=True, path=fname, size=len(raw))
+        echoed = _download_text(fname)
+        payload = {
+            "ok": True,
+            "path": fname,
+            "size": len(raw),
+            "sha_in": sha256(raw.encode("utf-8")).hexdigest(),
+            "sha_echo": sha256((echoed or "").encode("utf-8")).hexdigest(),
+        }
+        # no-cache anche qui
+        resp = make_response(jsonify(payload), 200)
+        for k, v in _nocache_headers({"ETag": f'W/"{payload["sha_echo"]}"'}).items():
+            resp.headers[k] = v
+        return resp
     except Exception as e:
         log.error(f"[PUT legacy] '{name}': {e}\n{traceback.format_exc()}")
         return jsonify(ok=False, error=str(e)), 500
