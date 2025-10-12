@@ -300,33 +300,27 @@ function log(msg, type='info'){
   // Espongo importer selections per year_single_selector.js
   window.__fileVersion = window.__fileVersion || {};
 
-async function putTextToServer(filename, text, {timeoutMs=15000} = {}) {
-  window.__fileVersion = window.__fileVersion || {};
+async function putTextToServer(filename, text, {timeoutMs=15000} = {}){
   const ctrl = new AbortController();
-  const to = setTimeout(() => ctrl.abort('timeout'), timeoutMs);
-  try {
-    const res = await fetch(`/api/files/text/${filename}`, {
+  const to = setTimeout(()=>ctrl.abort('timeout'), timeoutMs);
+  try{
+    const res = await fetch(`/api/files/${filename}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      headers: {'Content-Type':'text/plain; charset=utf-8'},
       body: text,
       cache: 'no-store',
       signal: ctrl.signal
     });
-    const payload = await res.json();
-    if (!res.ok || !payload?.ok)
-      throw new Error(`PUT failed ${res.status}`);
-    // salva hash per cache busting
-    window.__fileVersion[filename] = payload.sha_echo || Date.now();
-    return payload;
-  } finally {
-    clearTimeout(to);
-  }
+    const body = await res.text().catch(()=> '');
+    if(!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} ${body ? '- '+body : ''}`);
+    // bust per i GET successivi
+    window.__fileVersion[filename] = Date.now();
+    return body;
+  } finally { clearTimeout(to); }
 }
-
-async function getTextFromServer(filename) {
-  window.__fileVersion = window.__fileVersion || {};
+  async function getTextFromServer(filename){
   const ver = window.__fileVersion?.[filename] || Date.now();
-  const url = `/api/files/text/${filename}?v=${ver}`;
+  const url = `/api/files/${filename}?v=${ver}`;
   const res = await fetch(url, {
     cache: 'no-store',
     headers: {
@@ -334,10 +328,8 @@ async function getTextFromServer(filename) {
       'Pragma': 'no-cache'
     }
   });
-  const payload = await res.json();
-  if (!res.ok || !payload?.ok)
-    throw new Error('HTTP ' + res.status);
-  return payload.text || '';
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  return res.text();
 }
 
 
@@ -1399,7 +1391,7 @@ document.addEventListener('keydown', (e)=>{
   document.getElementById('jump-today').addEventListener('click', jumpToToday);
 
   // init
-  //autoLoad();
+  autoLoad();
 
   // Ascolto eventi dal selettore anno esterno
   try{
@@ -1601,17 +1593,6 @@ document.addEventListener('keydown', (e)=>{
 
   window.__SaveTracker = SaveTracker;
 })();
-// Ensure immediate flush on tab hide/refresh
-window.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') {
-    try { saveNow(); } catch (e) {}
-  }
-});
-
-window.addEventListener('pagehide', () => {
-  try { saveNow(); } catch (e) {}
-});
-
 </script>
 
 </body>
