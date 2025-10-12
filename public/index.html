@@ -916,20 +916,6 @@ function normSelectionsText(s){
     .trim();
 }
 
-/* ------- AutoSave (debounce + coalescing) ------- */
-/* ------- SAVE STATE (coalescing) ------- */
-let __saveInFlight = false;
-let __saveQueued = false;
-let __saveTimer = null;
-
-function normSelectionsText(s){
-  return String(s||'')
-    .replace(/
-/g, '
-')      // CRLF -> LF
-    .replace(/[ 	]+$/gm, '')      // spazi a fine riga
-    .trim();
-}
 
 /* ------- AutoSave (debounce + coalescing) ------- */
 async function saveNow(){
