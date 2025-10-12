@@ -1621,5 +1621,106 @@ document.addEventListener('keydown', (e)=>{
 })();
 </script>
 <!-- ==== /Year Selector + Cloud Adapter ==== -->
+<script>
+/* ==========================================================
+   SaveTracker: spia salvataggi + blocco refresh
+   - Intercetta TUTTI i fetch PUT verso /api/files/... e /api/files/text/...
+   - Mostra badge in alto a destra:
+       🟠 "Salvataggio in corso..." quando esistono PUT pendenti
+       🟢 "Tutto salvato" quando la coda è vuota
+   - Impedisce refresh/chiusura (beforeunload) finché ci sono salvataggi attivi
+   ========================================================== */
+
+(function(){
+  // --- Badge UI
+  const badge = document.createElement('div');
+  badge.id = 'save-indicator';
+  badge.style.cssText = `
+    position: fixed;
+    top: 10px;
+    right: 14px;
+    z-index: 9999;
+    padding: 8px 14px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-family: system-ui, sans-serif;
+    background: #14532d; /* verde */
+    color: #dcfce7;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    transition: background .25s, color .25s, opacity .25s;
+    opacity: .95;
+    pointer-events: none;
+  `;
+  badge.textContent = '🟢 Tutto salvato';
+  document.addEventListener('DOMContentLoaded', () => document.body.appendChild(badge));
+
+  // --- Stato e utilità
+  const SaveTracker = {
+    active: 0,
+    match(url, method){
+      if (!method || method.toUpperCase() !== 'PUT') return false;
+      try{
+        const u = new URL(url, location.href);
+        return u.pathname.startsWith('/api/files/') || u.pathname.startsWith('/api/files/text/');
+      }catch(_){
+        // url relativo semplice
+        return (typeof url === 'string')
+          && url.startsWith('/api/files/')
+          || url.startsWith('/api/files/text/');
+      }
+    },
+    inc(){
+      this.active++;
+      this.render();
+    },
+    dec(){
+      if (this.active > 0) this.active--;
+      this.render();
+    },
+    render(){
+      if (this.active > 0){
+        badge.textContent = '🟠 Salvataggio in corso...';
+        badge.style.background = '#b45309';   // arancione
+        badge.style.color = '#fff7ed';
+      } else {
+        badge.textContent = '🟢 Tutto salvato';
+        badge.style.background = '#14532d';   // verde
+        badge.style.color = '#dcfce7';
+      }
+    }
+  };
+
+  // --- Patch globale di fetch (conta PUT verso /api/files...)
+  const _origFetch = window.fetch;
+  window.fetch = async function(input, init){
+    const method = (init && init.method) || (input && input.method) || 'GET';
+    const url = (typeof input === 'string') ? input : (input && input.url);
+
+    const track = SaveTracker.match(url, method);
+    if (track) SaveTracker.inc();
+
+    try{
+      const res = await _origFetch.apply(this, arguments);
+      return res;
+    } finally {
+      if (track) SaveTracker.dec();
+    }
+  };
+
+  // --- Blocca refresh/chiusura mentre ci sono salvataggi attivi
+  window.addEventListener('beforeunload', (e) => {
+    if (SaveTracker.active > 0){
+      const msg = 'Sono in corso salvataggi. Attendere prima di chiudere o ricaricare.';
+      e.preventDefault();
+      e.returnValue = msg; // per alcuni browser
+      return msg;
+    }
+  });
+
+  // --- API opzionale: se vuoi contare manualmente operazioni custom
+  window.__SaveTracker = SaveTracker;
+})();
+</script>
+
 </body>
 </html>
