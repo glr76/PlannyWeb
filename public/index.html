@@ -308,8 +308,40 @@ td, th {padding: 2px 4px;}
   }
 
   // Espongo importer selections per year_single_selector.js
-  window.importSelectionsFromText = importSelectionsFromText;
-  window.__SINGLE_IMPORTER = "importSelectionsFromText";
+  \1
+/* ------- SAVE STATE (coalescing) ------- */
+let __saveInFlight = false;
+let __saveQueued = false;
+let __saveTimer = null;
+
+function normSelectionsText(s){
+  return String(s||'')
+    .replace(/
+/g, '
+')
+    .replace(/[ 	]+$/gm, '')
+    .trim();
+}
+
+/* ------- AutoSave (debounce + coalescing) ------- */
+async function saveNow(){
+  try{
+    await saveSelectionsToServer();
+    await appendLogsToServer();
+  }catch(e){
+    log('Errore saveNow: '+(e && e.message || e), 'warn');
+  }
+}
+
+function scheduleAutoSave(delayMs = 800){
+  if (__saveTimer) return; // già pianificato
+  __saveTimer = setTimeout(async ()=>{
+    __saveTimer = null;
+    await saveSelectionsToServer();
+    await appendLogsToServer();
+  }, delayMs);
+}
+window.__SINGLE_IMPORTER = "importSelectionsFromText";
   async function fetchJSON(url){
     try{
       const r=await fetch(url,{cache:'no-cache'});
@@ -323,8 +355,30 @@ td, th {padding: 2px 4px;}
 
   // Espongo importer selections per year_single_selector.js
   window.importSelectionsFromText = importSelectionsFromText;
-  async function putTextToServer(name, content){
-    const r = await fetch(`/api/files/${encodeURIComponent(name)}`, {
+  async function putTextToServer(filename, text, {timeoutMs=15000} = {}){
+  const ctrl = new AbortController();
+  const to = setTimeout(()=>ctrl.abort('timeout'), timeoutMs);
+  try{
+    const res = await fetch(`/api/files/${encodeURIComponent(filename)}`, {
+      method: 'PUT',
+      headers: {'Content-Type':'text/plain; charset=utf-8'},
+      body: text,
+      cache: 'no-store',
+      signal: ctrl.signal
+    });
+    const body = await res.text().catch(()=> '');
+    if (!res.ok){
+      throw new Error(`HTTP ${res.status} ${res.statusText} ${body ? '- '+body : ''}`);
+    }
+    try{ log(`PUT OK ${filename}: ${body||'OK'}`, 'ok'); }catch(_){}
+    return body;
+  } catch(err){
+    try{ log(`PUT FAIL ${filename}: ${err && err.message || err}`, 'error'); }catch(_){}
+    throw err;
+  } finally {
+    clearTimeout(to);
+  }
+}`, {
       method:'PUT', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:content
     });
     if(!r.ok) throw new Error('HTTP '+r.status);
@@ -366,7 +420,50 @@ td, th {padding: 2px 4px;}
     logFlushCursor = logBuffer.length;
     return chunk;
   }
-  async function appendLogsToServer(opts={force:false}){
+  let logFlushCursor = window.logFlushCursor || 0;
+let logBuffer = window.logBuffer || [];
+
+function logsChunkSinceCursor(){
+  if (logFlushCursor >= logBuffer.length) return '';
+  const chunk = logBuffer.slice(logFlushCursor).join('
+') + '
+';
+  logFlushCursor = logBuffer.length;
+  return chunk;
+}
+function logCacheKey(year){ return `log_cache_${year}`; }
+
+async function appendLogsToServer(opts={force:false}){
+  const year = state.year;
+  const name = `planny_log_${year}.txt`;
+
+  let chunk = logsChunkSinceCursor();
+  if (!chunk && opts.force){
+    chunk = `[${new Date().toLocaleString()}] Sessione avviata su ${location.href}
+`;
+  }
+  if (!chunk) return;
+
+  let prev = '';
+  try { prev = localStorage.getItem(logCacheKey(year)) || ''; } catch(_) {}
+  const merged = (prev + chunk).replace(/
+/g,'
+');
+
+  const taskId = `log:${name}:${Date.now()}`;
+  if (window.__SaveTracker && __SaveTracker.start) __SaveTracker.start(taskId);
+
+  try{
+    await putTextToServer(name, merged);
+    try { localStorage.setItem(logCacheKey(year), merged); } catch(_){}
+    log('Log aggiornato (PUT) su server: '+name, 'ok');
+    if (window.__SaveTracker && __SaveTracker.ok) __SaveTracker.ok(taskId);
+  }catch(err){
+    if (window.__SaveTracker && __SaveTracker.fail) __SaveTracker.fail(taskId, err);
+    log('Impossibile aggiornare il log via PUT: '+(err && err.message || err), 'warn');
+    try { localStorage.setItem(logCacheKey(year), merged); } catch(_){}
+  }
+}){
     const name = save.logName || (`planny_log_${state.year}.txt`);
     let chunk = logsChunkSinceCursor();
     if(!chunk && opts.force){
@@ -417,10 +514,34 @@ td, th {padding: 2px 4px;}
   }
   async function saveSelectionsToServer(){
   const name = selectionsFileName();
+  if (window.__saveInFlight){ window.__saveQueued = true; return; }
+  window.__saveInFlight = true;
 
-  // Evita corse parallele: coalescing
-  if (__saveInFlight) { __saveQueued = true; return; }
-  __saveInFlight = true;
+  const taskId = `selections:${name}:${Date.now()}`;
+  if (window.__SaveTracker && __SaveTracker.start) __SaveTracker.start(taskId);
+
+  try{
+    const textRaw = selectionsToText();
+    const text = normSelectionsText(textRaw) + '
+';
+    await putTextToServer(name, text);
+    try{ localStorage.setItem('selections_'+state.year, text); }catch(_){}
+    log('Selections salvati su server: '+name, 'ok');
+    if (window.__SaveTracker && __SaveTracker.ok) __SaveTracker.ok(taskId);
+  }catch(err){
+    if (window.__SaveTracker && __SaveTracker.fail) __SaveTracker.fail(taskId, err);
+    log('Server non disponibile per selections (download locale): '+(err && err.message || err),'warn');
+    const text = selectionsToText();
+    try{ localStorage.setItem('selections_'+state.year, text); }catch(_){}
+    downloadTextFile(name, text);
+  }finally{
+    window.__saveInFlight = false;
+    if (window.__saveQueued){
+      window.__saveQueued = false;
+      scheduleAutoSave(300);
+    }
+  }
+}__saveInFlight = true;
 
   try{
     const textRaw = selectionsToText();
@@ -1009,6 +1130,21 @@ function normSelectionsText(s){
 }
 
 /* ------- AutoSave (debounce + coalescing) ------- */
+/* ------- SAVE STATE (coalescing) ------- */
+let __saveInFlight = false;
+let __saveQueued = false;
+let __saveTimer = null;
+
+function normSelectionsText(s){
+  return String(s||'')
+    .replace(/
+/g, '
+')
+    .replace(/[ 	]+$/gm, '')
+    .trim();
+}
+
+/* ------- AutoSave (debounce + coalescing) ------- */
 async function saveNow(){
   try{
     await saveSelectionsToServer();
@@ -1018,13 +1154,13 @@ async function saveNow(){
   }
 }
 
-function scheduleAutoSave(delayMs = 800){
-  if (__saveTimer) return; // già pianificato
-  __saveTimer = setTimeout(async ()=>{
-    __saveTimer = null;
-    await saveSelectionsToServer();
-    await appendLogsToServer();
-  }, delayMs);
+, delayMs);
+}catch(e){
+    log('Errore saveNow: '+(e && e.message || e), 'warn');
+  }
+}
+
+, delayMs);
 }
 
 
@@ -1622,111 +1758,67 @@ document.addEventListener('keydown', (e)=>{
 </script>
 <!-- ==== /Year Selector + Cloud Adapter ==== -->
 <script>
-/* ==========================================================
-   SaveTracker v2 — spia salvataggi + blocco refresh
-   Copre:
-     - debounce in attesa (__saveTimer del tuo autosave)
-     - coalescing in corso (__saveInFlight / __saveQueued)
-     - fetch PUT attivi verso /api/files/... e /api/files/text/...
-   ========================================================== */
+/* ============================== 
+   SaveTracker v3 (esplicito)
+   - stati: pending (🟠), ok (🟢), error (🔴)
+   - tiene conto di: debounce (__saveTimer), coalescing (__saveInFlight/__saveQueued)
+   - conta SOLO i salvataggi espliciti (selections/log) via __SaveTracker API
+   ============================== */
 (function(){
-  // --- Badge UI -------------------------------------------------
   const badge = document.createElement('div');
   badge.id = 'save-indicator';
   badge.style.cssText = `
-    position: fixed;
-    top: 10px;
-    right: 14px;
-    z-index: 9999;
-    padding: 8px 14px;
-    border-radius: 12px;
-    font-weight: 600;
-    font-family: system-ui, sans-serif;
-    background: #14532d; /* verde */
-    color: #dcfce7;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    transition: background .2s, color .2s, opacity .2s;
-    opacity: .95;
-    pointer-events: none;
+    position: fixed; top:10px; right:14px; z-index:9999;
+    padding:8px 14px; border-radius:12px; font-weight:600;
+    font-family: system-ui, sans-serif; box-shadow:0 2px 8px rgba(0,0,0,.15);
+    background:#14532d; color:#dcfce7; transition: background .2s, color .2s, opacity .2s; opacity:.95; pointer-events:none;
   `;
   badge.textContent = '🟢 Tutto salvato';
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => document.body.appendChild(badge));
-  } else {
-    document.body.appendChild(badge);
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ()=>document.body.appendChild(badge));
+  else document.body.appendChild(badge);
 
-  // --- Stato tracker --------------------------------------------
   const SaveTracker = {
-    activeFetch: 0,        // PUT in corso (rete)
-    match(url, method){
-      if (!method || method.toUpperCase() !== 'PUT') return false;
-      try{
-        const u = new URL(url, location.href);
-        return u.pathname.startsWith('/api/files/') || u.pathname.startsWith('/api/files/text/');
-      }catch(_){
-        return (typeof url === 'string')
-          && (url.startsWith('/api/files/') || url.startsWith('/api/files/text/'));
+    pending: new Set(),
+    lastError: null,
+    start(id){ this.pending.add(id); this.lastError=null; this.render(); },
+    ok(id){ this.pending.delete(id); this.render(); },
+    fail(id, err){ this.lastError = err || 'Errore salvataggio'; this.pending.delete(id); this.render(true); },
+    isWaiting(){
+      const debounce = !!(window.__saveTimer);
+      const inFlight = !!(window.__saveInFlight);
+      const queued   = !!(window.__saveQueued);
+      return debounce || inFlight || queued;
+    },
+    render(forceError){
+      if (forceError || this.lastError){
+        badge.textContent = '🔴 Errore salvataggio';
+        badge.style.background = '#7f1d1d';
+        badge.style.color = '#fee2e2';
+        return;
       }
-    },
-    // Stato "pending" completo: include debounce/flags del tuo autosave
-    isPending(){
-      const inFlight   = !!(window.__saveInFlight);
-      const queued     = !!(window.__saveQueued);
-      const debounce   = !!(window.__saveTimer); // timer non nullo => save pianificato
-      const netActive  = this.activeFetch > 0;
-      return inFlight || queued || debounce || netActive;
-    },
-    render(){
-      if (this.isPending()){
+      if (this.pending.size > 0 || this.isWaiting()){
         badge.textContent = '🟠 Salvataggio in corso...';
-        badge.style.background = '#b45309';   // arancione
+        badge.style.background = '#b45309';
         badge.style.color = '#fff7ed';
       } else {
         badge.textContent = '🟢 Tutto salvato';
-        badge.style.background = '#14532d';   // verde
+        badge.style.background = '#14532d';
         badge.style.color = '#dcfce7';
       }
     }
   };
 
-  // --- Patch fetch: conta i PUT verso /api/files... -------------
-  const _origFetch = window.fetch;
-  window.fetch = async function(input, init){
-    const method = (init && init.method) || (input && input.method) || 'GET';
-    const url = (typeof input === 'string') ? input : (input && input.url);
-    const track = SaveTracker.match(url, method);
-
-    if (track) { SaveTracker.activeFetch++; SaveTracker.render(); }
-
-    try{
-      const res = await _origFetch.apply(this, arguments);
-      // NB: il server tuo risponde solo dopo l'upload completato;
-      // quando arriviamo qui, il PUT è stato gestito lato server.
-      return res;
-    } finally {
-      if (track) { SaveTracker.activeFetch--; SaveTracker.render(); }
-    }
-  };
-
-  // --- Poll leggero: segue anche __saveTimer/Queued/Inflight ----
-  // (utile perché quei flag cambiano senza passare da fetch)
   setInterval(()=> SaveTracker.render(), 200);
 
-  // --- Blocca refresh/chiusura quando c'è pending ----------------
-  window.addEventListener('beforeunload', (e) => {
-    if (SaveTracker.isPending()){
+  window.addEventListener('beforeunload', (e)=>{
+    if (SaveTracker.pending.size > 0 || SaveTracker.isWaiting()){
       const msg = 'Sono in corso salvataggi. Attendere prima di chiudere o ricaricare.';
-      e.preventDefault();
-      e.returnValue = msg; // per alcuni browser
-      return msg;
+      e.preventDefault(); e.returnValue = msg; return msg;
     }
   });
 
-  // Espone per debug (opzionale)
   window.__SaveTracker = SaveTracker;
 })();
 </script>
-
 </body>
 </html>
