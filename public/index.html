@@ -295,8 +295,6 @@ function log(msg, type='info'){
 
   /* ------- Helpers fetch/file ------- */
   
-  // Espongo importer selections per year_single_selector.js
-  window.importSelectionsFromText = importSelectionsFromText;
   window.__SINGLE_IMPORTER = "importSelectionsFromText";
   
   // Espongo importer selections per year_single_selector.js
@@ -334,12 +332,6 @@ async function putTextToServer(filename, text, {timeoutMs=15000} = {}){
   return res.text();
 }
 
-  function downloadTextFile(name, text){
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));
-    a.download=name; a.click();
-    setTimeout(()=>URL.revokeObjectURL(a.href),0);
-  }
 
   /* ------- Parser INI & colonne ------- */
   function parseIni(text){
@@ -365,7 +357,6 @@ function logsChunkSinceCursor(){
   window.logFlushCursor = window.logBuffer.length;
   return chunk;
 }
-function logCacheKey(year){ return `log_cache_${year}`; }
 
 async function appendLogsToServer(opts={force:false}){
   const year = state.year;
@@ -395,9 +386,6 @@ async function appendLogsToServer(opts={force:false}){
   }
 }
 
-
-  // Espongo importer selections per year_single_selector.js
-  window.importSelectionsFromText = importSelectionsFromText;
 
   /* ------- Config helpers ------- */
   function parseYearFromConfigTxt(text){
@@ -455,10 +443,6 @@ async function saveSelectionsToServer(){
 }
 
 
-
-  // Espongo importer selections per year_single_selector.js
-  window.importSelectionsFromText = importSelectionsFromText;
-
   /* ------- Festività ------- */
   async function loadHolidaysFromLocalOrWeb(){
   const fname = `festivi_${state.year}.txt`;
@@ -513,7 +497,6 @@ async function saveSelectionsToServer(){
 
 
   // Espongo importer selections per year_single_selector.js
-  window.importSelectionsFromText = importSelectionsFromText;
   
   // Espongo per script esterni
   window.loadHolidaysFromLocalOrWeb = loadHolidaysFromLocalOrWeb;
@@ -554,7 +537,7 @@ async function saveSelectionsToServer(){
   }
 
   // Espongo importer selections per year_single_selector.js
-  window.importSelectionsFromText = importSelectionsFromText;
+  
 
   /* ------- Editing / Commit ------- */
   function enterEdit(td){
@@ -713,7 +696,6 @@ function makeCell(date,name){
   }
 
   // Espongo importer selections per year_single_selector.js
-  window.importSelectionsFromText = importSelectionsFromText;
   function refreshCellByKey(key){
     const td=document.querySelector('td.cell[data-key="'+cssEscape(key)+'"]'); if(!td) return;
     const input=td.querySelector('input'); input.value=state.selections.get(key)||'';
@@ -862,9 +844,7 @@ function makeCell(date,name){
 
 
   // Espongo importer selections per year_single_selector.js
-  window.importSelectionsFromText = importSelectionsFromText;
 
-  
   /* ------- Year Change Glue (per script esterno) ------- */
   function reconfigureAfterYearChange(){
     try{
@@ -931,7 +911,6 @@ function makeCell(date,name){
   }
 
   // Espongo importer selections per year_single_selector.js
-  window.importSelectionsFromText = importSelectionsFromText;
 
   /* ------- AutoSave ------- */
   /* ------- SAVE STATE (coalescing) ------- */
@@ -994,7 +973,6 @@ function scheduleAutoSave(delayMs = 800){
   }
 
   // Espongo importer selections per year_single_selector.js
-  window.importSelectionsFromText = importSelectionsFromText;
   function selectRange(aTd, bTd){
     if(!aTd || !bTd) return;
     const table = document.getElementById('calendar');
@@ -1360,8 +1338,6 @@ document.addEventListener('keydown', (e)=>{
     }
   }
 
-  // Espongo importer selections per year_single_selector.js
-  window.importSelectionsFromText = importSelectionsFromText;
   qEl.addEventListener('input', ()=> buildSearchHits(qEl.value));
   qEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); gotoSearch(+1); } });
   prevBtn.addEventListener('click', ()=> gotoSearch(-1));
@@ -1412,8 +1388,6 @@ document.addEventListener('keydown', (e)=>{
     }
   }
 
-  // Espongo importer selections per year_single_selector.js
-  window.importSelectionsFromText = importSelectionsFromText;
 
   document.getElementById('jump-today').addEventListener('click', jumpToToday);
 
