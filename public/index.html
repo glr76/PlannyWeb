@@ -397,24 +397,24 @@ async function appendLogsToServer(opts={force:false}){
   }
   if (!chunk) return;
 
-  let prev = '';
-  try { prev = localStorage.getItem(logCacheKey(year)) || ''; } catch(_) {}
-  const merged = (prev + chunk).replace(/\r\n/g,'\n');
-
   const taskId = `log:${name}:${Date.now()}`;
   __SaveTracker.start(taskId);
 
   try{
+    // 1) leggi dallo SCHEMA server (cache-buster già in getTextFromServer)
+    const serverText = await getTextFromServer(name).catch(()=> '');
+    // 2) append e normalizza
+    const merged = (serverText + chunk).replace(/\r\n/g,'\n');
+    // 3) scrivi su server
     await putTextToServer(name, merged);
-    try { localStorage.setItem(logCacheKey(year), merged); } catch(_){}
     log('Log aggiornato (PUT) su server: '+name, 'ok');
     __SaveTracker.ok(taskId);
   }catch(err){
     __SaveTracker.fail(taskId, err);
-    log('Impossibile aggiornare il log via PUT: '+(err && err.message || err), 'warn');
-    try { localStorage.setItem(logCacheKey(year), merged); } catch(_){}
+    throw err; // nessun fallback locale
   }
 }
+
 
   // Espongo importer selections per year_single_selector.js
   window.importSelectionsFromText = importSelectionsFromText;
@@ -541,42 +541,19 @@ async function saveSelectionsToServer(){
     return set;
   }
   async function saveFestiviToServer(year, lines){
-    const name = `festivi_${year}.txt`;
-    const payload = lines.join('\n') + '\n';
-    const endpoint = `/api/files/${encodeURIComponent(name)}`;
+  const name = `festivi_${year}.txt`;
+  const payload = lines.join('\n') + '\n';
+  // server-only: un unico PUT, nessun fallback locale
+  const res = await fetch(`/api/files/${encodeURIComponent(name)}`, {
+    method: 'PUT',
+    headers: {'Content-Type':'text/plain;charset=utf-8'},
+    body: payload,
+    cache: 'no-store'
+  });
+  if(!res.ok) throw new Error('HTTP ' + res.status);
+  log('Festivi salvati su server: ' + name, 'ok');
+}
 
-    async function putNow(){
-      const r = await fetch(endpoint, {
-        method: 'PUT',
-        headers: {'Content-Type':'text/plain;charset=utf-8'},
-        body: payload
-      });
-      if(!r.ok) throw new Error('HTTP ' + r.status);
-      return true;
-    }
-
-    try{
-      await putNow();
-      log('Festivi salvati su server: ' + name, 'ok');
-      try{
-        const q = JSON.parse(localStorage.getItem('pendingFestivi') || '[]').filter(x => x.name !== name);
-        localStorage.setItem('pendingFestivi', JSON.stringify(q));
-      }catch(_){}
-      return;
-    }catch(err){
-      log('Server non disponibile ora per festivi: accodo e ritento in background. ' + (err.message || err), 'warn');
-      try{
-        const q = JSON.parse(localStorage.getItem('pendingFestivi') || '[]');
-        const i = q.findIndex(x => x.name === name);
-        const rec = { name, payload };
-        if(i >= 0) q[i] = rec; else q.push(rec);
-        localStorage.setItem('pendingFestivi', JSON.stringify(q));
-        scheduleFestiviRetry(1500);
-      }catch(e){
-        log('Impossibile accodare festivi in localStorage: ' + (e.message || e), 'err');
-      }
-    }
-  }
 
   // Espongo importer selections per year_single_selector.js
   window.importSelectionsFromText = importSelectionsFromText;
