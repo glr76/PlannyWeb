@@ -3,7 +3,6 @@ import os
 import io
 import logging
 import traceback
-import time
 from hashlib import sha256
 
 from flask import Flask, request, send_from_directory, Response, jsonify, abort, make_response
@@ -68,11 +67,24 @@ def _upload_text(path: str, content: str):
         "contentType": "text/plain; charset=utf-8",
         # molte versioni di supabase-py accettano 'upsert' e 'cacheControl' qui
         "upsert": True,
-        "cacheControl": "0",
+        "cacheControl": "no-store",
     }
 
-    # 1) Tenta UPDATE (se esiste già)
-    supabase.storage.from_(BUCKET).upload(path, data_bytes, file_opts) 
+    # 1) Tenta UPDATE (se esiste giÃ )
+    try:
+        # alcune versioni consentono opzioni anche su update; se non supportato non Ã¨ fatale
+        supabase.storage.from_(BUCKET).update(path, data_bytes, file_opts)  # type: ignore[arg-type]
+        return
+    except Exception as e:
+        log.info(f"[update] miss '{path}' -> try upload: {e}")
+
+    # 2) Fallback: UPLOAD (crea o sovrascrive con upsert=True)
+    try:
+        supabase.storage.from_(BUCKET).upload(path, data_bytes, file_opts)  # type: ignore[arg-type]
+        return
+    except Exception as e:
+        log.error(f"[upload] fail '{path}': {e}\n{traceback.format_exc()}")
+        raise
 
 
 def _nocache_headers(extra: dict | None = None) -> dict:
@@ -113,28 +125,22 @@ def api_text_put(name: str):
         fname = _sanitize(name)
         raw = request.get_data(as_text=True) or ""
 
+        # 1) scrivi
         _upload_text(fname, raw)
 
-        sha_in = sha256(raw.encode("utf-8")).hexdigest()
+        # 2) rileggi subito dal bucket (sorgente-veritÃ )
         echoed = _download_text(fname)
-        sha_echo = sha256((echoed or "").encode("utf-8")).hexdigest()
 
-        attempts = 0
-        while sha_echo != sha_in and attempts < 5:
-            time.sleep(0.16)  # 160 ms
-            echoed = _download_text(fname)
-            sha_echo = sha256((echoed or "").encode("utf-8")).hexdigest()
-            attempts += 1
-
+        # 3) risposta JSON con echo e SHA per verifica forte
         payload = {
             "ok": True,
             "name": fname,
             "size": len(raw),
             "echo": echoed,
-            "sha_in": sha_in,
-            "sha_echo": sha_echo,
-            "matched": sha_echo == sha_in,
+            "sha_in": sha256(raw.encode("utf-8")).hexdigest(),
+            "sha_echo": sha256((echoed or "").encode("utf-8")).hexdigest(),
         }
+
         # 4) headers no-cache anche sulla risposta PUT
         headers = _nocache_headers({"ETag": f'W/"{payload["sha_echo"]}"'})
         resp = make_response(jsonify(payload), 200)
@@ -175,39 +181,24 @@ def api_read_text_legacy(name: str):
 
 
 @app.put("/api/files/<path:name>")
-@app.put("/api/files/<path:name>")
 def api_write_text_legacy(name: str):
     try:
         fname = _sanitize(name)
         raw = request.get_data(as_text=True) or ""
         _upload_text(fname, raw)
-
-        sha_in = sha256(raw.encode("utf-8")).hexdigest()
         echoed = _download_text(fname)
-        sha_echo = sha256((echoed or "").encode("utf-8")).hexdigest()
-
-        attempts = 0
-        while sha_echo != sha_in and attempts < 5:
-            time.sleep(0.16)
-            echoed = _download_text(fname)
-            sha_echo = sha256((echoed or "").encode("utf-8")).hexdigest()
-            attempts += 1
-
         payload = {
             "ok": True,
             "path": fname,
             "size": len(raw),
-            "sha_in": sha_in,
-            "sha_echo": sha_echo,
-            "matched": sha_echo == sha_in,
+            "sha_in": sha256(raw.encode("utf-8")).hexdigest(),
+            "sha_echo": sha256((echoed or "").encode("utf-8")).hexdigest(),
         }
-
         # no-cache anche qui
         resp = make_response(jsonify(payload), 200)
         for k, v in _nocache_headers({"ETag": f'W/"{payload["sha_echo"]}"'}).items():
             resp.headers[k] = v
         return resp
-
     except Exception as e:
         log.error(f"[PUT legacy] '{name}': {e}\n{traceback.format_exc()}")
         return jsonify(ok=False, error=str(e)), 500
@@ -239,14 +230,14 @@ def healthz():
 
 
 # ----------------------------------------------------
-# STATIC (/public) – dichiarato DOPO le API per non interferire
+# STATIC (/public) - dichiarato DOPO le API per non interferire
 # ----------------------------------------------------
 @app.get("/")
 def index():
     ix = os.path.join(PUBLIC_DIR, "index.html")
     if not os.path.exists(ix):
         return "index.html non trovato in /public", 404
-    return send_from_directory(PUBLIC_DIR, "index.html", cache_timeout=0)
+    return send_from_directory(PUBLIC_DIR, "index.html")
 
 
 @app.get("/<path:asset>")
@@ -256,7 +247,7 @@ def static_files(asset):
     if not os.path.exists(path):
         abort(404)
     directory, fname = os.path.split(path)
-    return send_from_directory(directory, fname, cache_timeout=0)
+    return send_from_directory(directory, fname)
 
 
 # ----------------------------------------------------
