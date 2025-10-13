@@ -1,4 +1,4 @@
-# server_supabase.py — Flask + GitHub Contents API (read/write .txt) con anti-lag
+# server_render.py — Flask + GitHub Contents API + Auth (admin/user) + anti-lag
 import os
 import time
 import json
@@ -6,13 +6,18 @@ import base64
 import logging
 import traceback
 from hashlib import sha256
+from functools import wraps
 
 import requests
-from flask import Flask, request, send_from_directory, Response, jsonify, abort, make_response
+from flask import (
+    Flask, request, send_from_directory, Response,
+    jsonify, abort, make_response, session
+)
 from flask_cors import CORS
+from werkzeug.security import check_password_hash
 
 # ----------------------------------------------------
-# Config
+# Config base
 # ----------------------------------------------------
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 PUBLIC_DIR = os.path.join(BASE_DIR, "public")
@@ -20,24 +25,121 @@ PUBLIC_DIR = os.path.join(BASE_DIR, "public")
 GITHUB_REPO   = os.environ.get("GITHUB_REPO", "").strip()          # es. "glr76/PlannyWeb"
 GITHUB_BRANCH = os.environ.get("GITHUB_BRANCH", "main").strip()
 GITHUB_TOKEN  = os.environ.get("GITHUB_TOKEN", "").strip()
+
+# Prefisso cartella nel repo dove tenere i file (di default 'public/')
+GITHUB_DIR_PREFIX = os.environ.get("GITHUB_DIR_PREFIX", "public/").strip()
+if GITHUB_DIR_PREFIX and not GITHUB_DIR_PREFIX.endswith("/"):
+    GITHUB_DIR_PREFIX += "/"
+
 if not GITHUB_REPO:
     raise RuntimeError("Set GITHUB_REPO (es. 'utente/repo') nelle ENV")
+
 _GH_API = "https://api.github.com"
 
 # anti-lag: cache di scrittura in memoria (path -> {content, ts, sha})
-WRITE_CACHE_TTL = 120.0  # secondi
+WRITE_CACHE_TTL = 120.0
 _WRITE_CACHE: dict[str, dict] = {}
 _LAST_CACHE_HIT = False
 
+# ----------------------------------------------------
+# App & CORS
+# ----------------------------------------------------
+# Statici serviti da /public alla radice (/, /favicon.ico, /file.png, …)
 app = Flask(__name__, static_folder="public", static_url_path="")
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+CORS(app, resources={r"/api/*": {"origins": "*"}})  # API restano accessibili
 
 logging.basicConfig(level=logging.INFO)
 log = app.logger
 
+# ----------------------------------------------------
+# Auth (sessione + ruoli)
+# ----------------------------------------------------
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "change-me")
+
+USERS_JSON = os.environ.get("USERS_JSON", "{}").strip()
+try:
+    USERS = json.loads(USERS_JSON) if USERS_JSON else {}
+except Exception:
+    log.error("USERS_JSON malformato: usare JSON valido")
+    USERS = {}
+
+def get_user(username: str):
+    return USERS.get(username or "")
+
+def login_user(username: str):
+    session.clear()
+    session["user"] = username
+    session["role"] = (USERS.get(username) or {}).get("role")
+
+def logout_user():
+    session.clear()
+
+def current_user():
+    return session.get("user")
+
+def current_role():
+    return session.get("role")
+
+def requires_role(min_role="read"):
+    """Protegge una route in base al ruolo ('read' o 'write')."""
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            role = current_role()
+            if role is None:
+                return jsonify(ok=False, error="authentication required"), 401
+            if min_role == "write" and role != "write":
+                return jsonify(ok=False, error="permission denied"), 403
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
+
+@app.post("/login")
+def login_post():
+    """Body: JSON {"username":"...", "password":"..."}"""
+    try:
+        data = request.get_json(force=True, silent=False) or {}
+        username = (data.get("username") or "").strip()
+        password = data.get("password") or ""
+        if not username or not password:
+            return jsonify(ok=False, error="missing credentials"), 400
+        u = get_user(username)
+        if not u or not check_password_hash(u.get("pw_hash", ""), password):
+            return jsonify(ok=False, error="invalid username/password"), 401
+        login_user(username)
+        return jsonify(ok=True, user=username, role=u.get("role")), 200
+    except Exception as e:
+        log.error(f"[login] {e}\n{traceback.format_exc()}")
+        return jsonify(ok=False, error=str(e)), 500
+
+@app.post("/logout")
+def logout_post():
+    logout_user()
+    return jsonify(ok=True)
+
+@app.get("/me")
+def me():
+    return jsonify(ok=True, user=current_user(), role=current_role())
+
+# (opzionale) paginetta di test login
+@app.get("/login")
+def login_page():
+    html = """
+    <!doctype html><meta charset="utf-8"><title>Login</title>
+    <form id="f"><input name="username" placeholder="username">
+    <input name="password" type="password" placeholder="password">
+    <button>Login</button></form>
+    <script>
+    f.onsubmit = async (e)=>{e.preventDefault();
+      const body = {username:f.username.value, password:f.password.value};
+      const r = await fetch('/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      alert(await r.text()); location.href='/'}
+    </script>
+    """
+    return html
 
 # ----------------------------------------------------
-# Helpers
+# Helpers comuni
 # ----------------------------------------------------
 def _nocache_headers(extra: dict | None = None) -> dict:
     h = {
@@ -60,6 +162,9 @@ def _sanitize(name: str) -> str:
         name = name[1:]
     if ".." in name:
         raise ValueError("Invalid path")
+    # auto-prefix nella cartella configurata (p.es. "public/")
+    if GITHUB_DIR_PREFIX and not name.startswith(GITHUB_DIR_PREFIX):
+        name = GITHUB_DIR_PREFIX + name
     return name
 
 def _sha(txt: str) -> str:
@@ -67,7 +172,6 @@ def _sha(txt: str) -> str:
 
 def _etag(txt: str) -> str:
     return f'W/"{_sha(txt)}"'
-
 
 # ----------------------------------------------------
 # GitHub Contents API
@@ -77,22 +181,18 @@ def _gh_headers():
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
         "User-Agent": "planny-server/1.0",
-        # suggeriamo rievalidazione
-        "Cache-Control": "no-cache",
+        "Cache-Control": "no-cache",  # chiedi rievalidazione agli edge
     }
     if GITHUB_TOKEN:
         h["Authorization"] = f"Bearer {GITHUB_TOKEN}"
     return h
 
 def _gh_get_file(path: str) -> tuple[str, str | None]:
-    """
-    Ritorna (content_text, sha) se il file esiste, altrimenti ("", None).
-    """
     url = f"{_GH_API}/repos/{GITHUB_REPO}/contents/{path}"
     r = requests.get(
         url,
         headers=_gh_headers(),
-        params={"ref": GITHUB_BRANCH, "_t": str(time.time())},  # bust proxy caches
+        params={"ref": GITHUB_BRANCH, "_t": str(time.time())},
         timeout=20,
     )
     if r.status_code == 200:
@@ -105,11 +205,6 @@ def _gh_get_file(path: str) -> tuple[str, str | None]:
     raise RuntimeError(f"GitHub GET {r.status_code}: {r.text[:200]}")
 
 def _gh_put_file(path: str, content: str, sha: str | None) -> str:
-    """
-    Crea/aggiorna un file nel repo (branch configurato).
-    Se 'sha' è None fa create, altrimenti update.
-    Ritorna la sha del nuovo blob.
-    """
     url = f"{_GH_API}/repos/{GITHUB_REPO}/contents/{path}"
     payload = {
         "message": f"update {path} via API",
@@ -127,9 +222,6 @@ def _gh_put_file(path: str, content: str, sha: str | None) -> str:
     raise RuntimeError(f"GitHub PUT {r.status_code}: {r.text[:300]}")
 
 def _gh_list(prefix: str = "") -> list[dict]:
-    """
-    Lista file nella directory 'prefix' (solo primo livello).
-    """
     url = f"{_GH_API}/repos/{GITHUB_REPO}/contents/{prefix}"
     r = requests.get(
         url,
@@ -147,7 +239,6 @@ def _gh_list(prefix: str = "") -> list[dict]:
     if r.status_code == 404:
         return []
     raise RuntimeError(f"GitHub LIST {r.status_code}: {r.text[:200]}")
-
 
 # ----------------------------------------------------
 # I/O con anti-lag
@@ -171,7 +262,6 @@ def _download_text(path: str) -> str:
         return cached
     try:
         txt, _cur_sha = _gh_get_file(path)
-        # lettura da GitHub = miss
         global _LAST_CACHE_HIT
         _LAST_CACHE_HIT = False
         return txt
@@ -179,66 +269,62 @@ def _download_text(path: str) -> str:
         log.warning(f"[download-gh] fail '{path}': {e}")
         return ""
 
-def _upload_text(path: str, content: str):
-    try:
-        _current, cur_sha = _gh_get_file(path)     # sha corrente (se c'è)
-        new_sha = _gh_put_file(path, content, cur_sha)
-        log.info(f"[upload-gh] wrote '{path}' sha={new_sha[:8] if new_sha else 'unknown'}")
-        # anti-lag: metti subito in cache per servire letture istantanee
-        _WRITE_CACHE[path] = {"content": content, "ts": time.time(), "sha": new_sha}
-    except Exception as e:
-        log.error(f"[upload-gh] fail '{path}': {e}\n{traceback.format_exc()}")
-        raise
-
+def _upload_text(path: str, content: str) -> str:
+    """Scrive su GitHub e ritorna la content SHA."""
+    _current, cur_sha = _gh_get_file(path)
+    new_sha = _gh_put_file(path, content, cur_sha)
+    log.info(f"[upload-gh] wrote '{path}' sha={new_sha[:8] if new_sha else 'unknown'} on branch {GITHUB_BRANCH}")
+    _WRITE_CACHE[path] = {"content": content, "ts": time.time(), "sha": new_sha}
+    return new_sha or ""
 
 # ----------------------------------------------------
-# Error handler (JSON per /api/*)
+# Error handler API
 # ----------------------------------------------------
 @app.errorhandler(Exception)
 def _on_error(e):
     if request.path.startswith("/api/"):
         log.error(f"[unhandled] {e}\n{traceback.format_exc()}")
         return jsonify(ok=False, error=str(e)), 500
+    # per richieste non-API lascia il default (debug/off)
     raise e
 
+def _resp_with_cache_header(resp, txt: str):
+    resp.headers.update(_nocache_headers({"ETag": _etag(txt)}))
+    resp.headers["X-Write-Cache"] = "hit" if _LAST_CACHE_HIT else "miss"
+    return resp
 
 # ----------------------------------------------------
-# API FILES - JSON (raccomandato)
+# API FILES (JSON + text) — GET pubbliche, PUT protette
 # ----------------------------------------------------
 @app.get("/api/files/text/<path:name>")
 def api_text_get(name: str):
     fname = _sanitize(name)
     txt = _download_text(fname)
     status = 200 if txt != "" else 404
-    resp = make_response(jsonify(ok=(status == 200), name=fname, text=txt), status)
-    resp.headers.update(_nocache_headers({"ETag": _etag(txt)}))
-    resp.headers["X-Write-Cache"] = "hit" if _LAST_CACHE_HIT else "miss"
-    return resp
+    return _resp_with_cache_header(make_response(jsonify(
+        ok=(status == 200), name=fname, text=txt
+    ), status), txt)
 
 @app.put("/api/files/text/<path:name>")
+@requires_role("write")
 def api_text_put(name: str):
     fname = _sanitize(name)
     raw = request.get_data(as_text=True) or ""
-    _upload_text(fname, raw)
-    echoed = _download_text(fname)  # immediato via cache
+    commit_sha = _upload_text(fname, raw)
+    echoed = _download_text(fname)
     payload = {
         "ok": True,
         "name": fname,
+        "branch": GITHUB_BRANCH,
+        "commit_sha": commit_sha,
         "size": len(raw),
         "echo": echoed,
         "sha_in": _sha(raw),
         "sha_echo": _sha(echoed),
         "matched": _sha(raw) == _sha(echoed),
     }
-    resp = make_response(jsonify(payload), 200)
-    resp.headers.update(_nocache_headers({"ETag": _etag(echoed)}))
-    resp.headers["X-Write-Cache"] = "hit" if _LAST_CACHE_HIT else "miss"
-    return resp
+    return _resp_with_cache_header(make_response(jsonify(payload), 200), echoed)
 
-
-# ----------------------------------------------------
-# API FILES - Legacy (testo puro)
-# ----------------------------------------------------
 @app.get("/api/files/<path:name>")
 def api_read_text_legacy(name: str):
     fname = _sanitize(name)
@@ -254,23 +340,26 @@ def api_read_text_legacy(name: str):
     return resp
 
 @app.put("/api/files/<path:name>")
+@requires_role("write")
 def api_write_text_legacy(name: str):
     fname = _sanitize(name)
     raw = request.get_data(as_text=True) or ""
-    _upload_text(fname, raw)
+    commit_sha = _upload_text(fname, raw)
     echoed = _download_text(fname)
     payload = {
         "ok": True,
         "path": fname,
+        "branch": GITHUB_BRANCH,
+        "commit_sha": commit_sha,
         "size": len(raw),
         "sha_in": _sha(raw),
         "sha_echo": _sha(echoed),
+        "matched": _sha(raw) == _sha(echoed),
     }
     resp = make_response(jsonify(payload), 200)
     resp.headers.update(_nocache_headers({"ETag": _etag(echoed)}))
     resp.headers["X-Write-Cache"] = "hit" if _LAST_CACHE_HIT else "miss"
     return resp
-
 
 # ----------------------------------------------------
 # LIST + HEALTH
@@ -278,8 +367,9 @@ def api_write_text_legacy(name: str):
 @app.get("/api/files/list")
 def api_list_files():
     try:
-        files = _gh_list("public")  # root del repo; usa "public" se vuoi solo quella cartella
-        return jsonify(ok=True, source="github", count=len(files), files=files)
+        prefix = GITHUB_DIR_PREFIX.rstrip("/") if GITHUB_DIR_PREFIX else ""
+        files = _gh_list(prefix)
+        return jsonify(ok=True, source="github", branch=GITHUB_BRANCH, prefix=GITHUB_DIR_PREFIX, count=len(files), files=files)
     except Exception as e:
         log.error(f"[LIST] {e}\n{traceback.format_exc()}")
         return jsonify(ok=False, error=str(e)), 500
@@ -288,46 +378,19 @@ def api_list_files():
 def healthz():
     return "ok"
 
-
 # ----------------------------------------------------
-# STATIC (/public) – serviti dal repo
+# STATIC: index + favicon (gli altri statici li serve Flask automaticamente da /public)
 # ----------------------------------------------------
-@app.get("/")
 @app.get("/")
 def index():
-    try:
-        # usa il meccanismo built-in di Flask per la static_folder
-        resp = app.send_static_file("index.html")
-        resp.cache_control.no_store = True
-        resp.headers["Pragma"] = "no-cache"
-        resp.headers["Expires"] = "0"
-        return resp
-    except FileNotFoundError:
-        return "index.html non trovato in /public", 404
-    except Exception as e:
-        log.error(f"[index] static error: {e}")
-        return "Internal error serving index.html", 500
+    return app.send_static_file("index.html")
 
-
-@app.get("/<path:asset>")
-@app.get("/<path:asset>")
-def static_files(asset):
-    try:
-        resp = send_from_directory(PUBLIC_DIR, asset, cache_timeout=0)
-        resp.cache_control.no_store = True
-        resp.headers["Pragma"] = "no-cache"
-        resp.headers["Expires"] = "0"
-        return resp
-    except FileNotFoundError:
-        abort(404)
-    except Exception as e:
-        log.error(f"[static] error for '{asset}': {e}")
-        return "Internal error serving static asset", 500
-
-
+@app.get("/favicon.ico")
+def favicon():
+    return app.send_static_file("favicon.ico")
 
 # ----------------------------------------------------
-# MAIN (sviluppo)
+# MAIN
 # ----------------------------------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
