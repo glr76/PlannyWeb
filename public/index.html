@@ -304,7 +304,7 @@ async function putTextToServer(filename, text, {timeoutMs=15000} = {}){
   const ctrl = new AbortController();
   const to = setTimeout(()=>ctrl.abort('timeout'), timeoutMs);
   try{
-    const res = await fetch(`/api/files/${filename}`, {
+    const res = await fetch(`/api/files/public/${filename}`, {
       method: 'PUT',
       headers: {'Content-Type':'text/plain; charset=utf-8'},
       body: text,
@@ -320,7 +320,7 @@ async function putTextToServer(filename, text, {timeoutMs=15000} = {}){
 }
   async function getTextFromServer(filename){
   const ver = window.__fileVersion?.[filename] || Date.now();
-  const url = `/api/files/${filename}?v=${ver}`;
+  const url = `/api/files/public/${filename}?v=${ver}`;
   const res = await fetch(url, {
     cache: 'no-store',
     headers: {
@@ -485,7 +485,7 @@ async function saveSelectionsToServer(){
   const name = `festivi_${year}.txt`;
   const payload = lines.join('\n') + '\n';
   // server-only: un unico PUT, nessun fallback locale
-  const res = await fetch(`/api/files/${encodeURIComponent(name)}`, {
+  const res = await fetch(`/api/files/public/${encodeURIComponent(name)}`, {
     method: 'PUT',
     headers: {'Content-Type':'text/plain;charset=utf-8'},
     body: payload,
