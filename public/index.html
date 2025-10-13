@@ -1661,17 +1661,21 @@ async function refreshAuthBar(){
 }
 
 window.addEventListener('DOMContentLoaded', ()=>{
-  const btnLogin = document.getElementById('btn-login');
-  const btnLogout = document.getElementById('btn-logout');
-  if(btnLogin){
-    btnLogin.addEventListener('click', async ()=>{
-      const username = prompt('Username (admin o user)');
-      if (!username) return;
-      const password = prompt('Password (admin123 o user123)');
-      if (!password) return;
-      const j = await apiLogin(username, password);
-      if (!j.ok){ alert(j.error || 'Login fallito'); return; }
-      await refreshAuthBar();
+  const password = prompt('Password admin:');
+if (!password) return;
+const res = await fetch('/login', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  credentials: 'same-origin',
+  body: JSON.stringify({ password })
+});
+const j = await res.json();
+if (!j.ok) {
+  alert(j.error || 'Login fallito');
+  return;
+}
+await refreshAuthBar();
+
     });
   }
   if(btnLogout){
