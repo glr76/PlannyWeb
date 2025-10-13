@@ -1,8 +1,8 @@
 # server_supabase.py
 import os
-import io
 import logging
 import traceback
+import time
 from hashlib import sha256
 
 from flask import Flask, request, send_from_directory, Response, jsonify, abort, make_response
@@ -34,7 +34,7 @@ log = app.logger
 
 
 # ----------------------------------------------------
-# Helpers Storage
+# Helpers
 # ----------------------------------------------------
 def _sanitize(name: str) -> str:
     """Evita percorsi strani e normalizza gli slash."""
@@ -49,6 +49,7 @@ def _sanitize(name: str) -> str:
 
 
 def _download_text(path: str) -> str:
+    """Legge il file dal bucket e ritorna testo UTF-8 (o stringa vuota se non trovato/errore)."""
     try:
         data = supabase.storage.from_(BUCKET).download(path)
         return data.decode("utf-8", "replace")
@@ -59,35 +60,60 @@ def _download_text(path: str) -> str:
 
 def _upload_text(path: str, content: str):
     """
-    Scrive il file assicurando metadata anti-cache nel bucket.
-    Tenta update; se fallisce, fa upload (creazione).
+    Scrive il file su Supabase Storage con metadata anti-cache.
+    - Forza cache_control=0 (niente TTL sulla CDN)
+    - Prova sia snake_case che camelCase per compatibilità tra versioni dell'SDK
+    - Tenta update(); se non va, fallback su upload(upsert=True)
     """
     data_bytes = content.encode("utf-8")
-    file_opts = {
-        "contentType": "text/plain; charset=utf-8",
-        # molte versioni di supabase-py accettano 'upsert' e 'cacheControl' qui
+
+    # Opzioni preferite (snake_case) per supabase-py recenti
+    opts_snake = {
+        "content_type": "text/plain; charset=utf-8",
         "upsert": True,
-        "cacheControl": "no-store",
+        "cache_control": "0",   # <-- TTL zero a livello CDN
+    }
+    # Fallback camelCase per SDK meno recenti
+    opts_camel = {
+        "contentType": "text/plain; charset=utf-8",
+        "upsert": True,
+        "cacheControl": "0",
     }
 
-    # 1) Tenta UPDATE (se esiste già)
-    try:
-        # alcune versioni consentono opzioni anche su update; se non supportato non è fatale
-        supabase.storage.from_(BUCKET).update(path, data_bytes, file_opts)  # type: ignore[arg-type]
-        return
-    except Exception as e:
-        log.info(f"[update] miss '{path}' -> try upload: {e}")
+    store = supabase.storage.from_(BUCKET)
 
-    # 2) Fallback: UPLOAD (crea o sovrascrive con upsert=True)
+    # 1) tenta UPDATE con opzioni snake_case
     try:
-        supabase.storage.from_(BUCKET).upload(path, data_bytes, file_opts)  # type: ignore[arg-type]
+        store.update(path, data_bytes, opts_snake)  # type: ignore[arg-type]
         return
-    except Exception as e:
-        log.error(f"[upload] fail '{path}': {e}\n{traceback.format_exc()}")
+    except Exception as e_snake_upd:
+        log.info(f"[update snake] miss '{path}': {e_snake_upd}")
+
+    # 2) tenta UPDATE con opzioni camelCase
+    try:
+        store.update(path, data_bytes, opts_camel)  # type: ignore[arg-type]
+        return
+    except Exception as e_camel_upd:
+        log.info(f"[update camel] miss '{path}': {e_camel_upd}")
+
+    # 3) fallback: UPLOAD con snake_case
+    try:
+        store.upload(path, data_bytes, opts_snake)  # type: ignore[arg-type]
+        return
+    except Exception as e_snake_upl:
+        log.info(f"[upload snake] miss '{path}': {e_snake_upl}")
+
+    # 4) ultimo tentativo: UPLOAD con camelCase
+    try:
+        store.upload(path, data_bytes, opts_camel)  # type: ignore[arg-type]
+        return
+    except Exception as e_camel_upl:
+        log.error(f"[upload fail] '{path}': {e_camel_upl}\n{traceback.format_exc()}")
         raise
 
 
 def _nocache_headers(extra: dict | None = None) -> dict:
+    """Header per disabilitare cache a livello di risposta Flask / proxy a valle di Flask."""
     h = {
         "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate",
         "Pragma": "no-cache",
@@ -99,6 +125,28 @@ def _nocache_headers(extra: dict | None = None) -> dict:
     return h
 
 
+def _sha(txt: str) -> str:
+    return sha256((txt or "").encode("utf-8")).hexdigest()
+
+
+def _read_back_until_match(path: str, expected_sha: str, timeout_s: float = 1.6) -> tuple[str, str, bool]:
+    """
+    Dopo un upload, la CDN di Storage può servire per un attimo la vecchia versione.
+    Qui rileggiamo ripetutamente finché l'SHA non combacia o finché scade il timeout.
+    Ritorna: (echo_text, echo_sha, matched)
+    """
+    start = time.time()
+    delay = 0.05
+    echo = _download_text(path)
+    echo_sha = _sha(echo)
+    while echo_sha != expected_sha and (time.time() - start) < timeout_s:
+        time.sleep(delay)
+        delay = min(delay * 2, 0.4)  # backoff fino a 400ms
+        echo = _download_text(path)
+        echo_sha = _sha(echo)
+    return echo, echo_sha, (echo_sha == expected_sha)
+
+
 # ----------------------------------------------------
 # API FILES - JSON (raccomandato)
 # ----------------------------------------------------
@@ -108,7 +156,7 @@ def api_text_get(name: str):
         fname = _sanitize(name)
         txt = _download_text(fname)
         status = 200 if txt != "" else 404
-        etag = sha256((txt or "").encode("utf-8")).hexdigest()
+        etag = _sha(txt)
         headers = _nocache_headers({"ETag": f'W/"{etag}"'})
         resp = make_response(jsonify(ok=(status == 200), name=fname, text=txt), status)
         for k, v in headers.items():
@@ -128,8 +176,9 @@ def api_text_put(name: str):
         # 1) scrivi
         _upload_text(fname, raw)
 
-        # 2) rileggi subito dal bucket (sorgente-verità)
-        echoed = _download_text(fname)
+        # 2) rileggi con retry fino a match (gestisce eventuale staleness CDN)
+        sha_in = _sha(raw)
+        echoed, sha_echo, matched = _read_back_until_match(fname, sha_in)
 
         # 3) risposta JSON con echo e SHA per verifica forte
         payload = {
@@ -137,12 +186,13 @@ def api_text_put(name: str):
             "name": fname,
             "size": len(raw),
             "echo": echoed,
-            "sha_in": sha256(raw.encode("utf-8")).hexdigest(),
-            "sha_echo": sha256((echoed or "").encode("utf-8")).hexdigest(),
+            "sha_in": sha_in,
+            "sha_echo": sha_echo,
+            "matched": matched,
         }
 
         # 4) headers no-cache anche sulla risposta PUT
-        headers = _nocache_headers({"ETag": f'W/"{payload["sha_echo"]}"'})
+        headers = _nocache_headers({"ETag": f'W/"{sha_echo}"'})
         resp = make_response(jsonify(payload), 200)
         for k, v in headers.items():
             resp.headers[k] = v
@@ -169,7 +219,7 @@ def api_read_text_legacy(name: str):
                 mimetype="text/plain; charset=utf-8",
                 headers=_nocache_headers(),
             )
-        etag = sha256(txt.encode("utf-8")).hexdigest()
+        etag = _sha(txt)
         headers = _nocache_headers({
             "ETag": f'W/"{etag}"',
             "Content-Disposition": f'inline; filename="{os.path.basename(fname)}"',
@@ -186,17 +236,21 @@ def api_write_text_legacy(name: str):
         fname = _sanitize(name)
         raw = request.get_data(as_text=True) or ""
         _upload_text(fname, raw)
-        echoed = _download_text(fname)
+
+        sha_in = _sha(raw)
+        echoed, sha_echo, matched = _read_back_until_match(fname, sha_in)
+
         payload = {
             "ok": True,
             "path": fname,
             "size": len(raw),
-            "sha_in": sha256(raw.encode("utf-8")).hexdigest(),
-            "sha_echo": sha256((echoed or "").encode("utf-8")).hexdigest(),
+            "sha_in": sha_in,
+            "sha_echo": sha_echo,
+            "matched": matched,
         }
         # no-cache anche qui
         resp = make_response(jsonify(payload), 200)
-        for k, v in _nocache_headers({"ETag": f'W/"{payload["sha_echo"]}"'}).items():
+        for k, v in _nocache_headers({"ETag": f'W/"{sha_echo}"'}).items():
             resp.headers[k] = v
         return resp
     except Exception as e:
@@ -237,7 +291,8 @@ def index():
     ix = os.path.join(PUBLIC_DIR, "index.html")
     if not os.path.exists(ix):
         return "index.html non trovato in /public", 404
-    return send_from_directory(PUBLIC_DIR, "index.html")
+    # cache_timeout=0 per evitare che dev browser tenga versioni vecchie
+    return send_from_directory(PUBLIC_DIR, "index.html", cache_timeout=0)
 
 
 @app.get("/<path:asset>")
@@ -247,7 +302,7 @@ def static_files(asset):
     if not os.path.exists(path):
         abort(404)
     directory, fname = os.path.split(path)
-    return send_from_directory(directory, fname)
+    return send_from_directory(directory, fname, cache_timeout=0)
 
 
 # ----------------------------------------------------
