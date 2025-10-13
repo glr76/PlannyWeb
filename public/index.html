@@ -137,15 +137,6 @@ td, th {padding: 2px 4px;}
   <button id="btn-logout" style="display:none">Logout</button>
 </div>
 
-  <div class="card">
-    <div class="bar">
-      <div><label>Anno</label><input id="year" type="number" min="1900" max="2100" disabled /></div>
-      <div><label>Nomi Team</label><input id="names" type="text" disabled /></div>
-      <div><label>Opzioni</label><input id="options" type="text" disabled /></div>
-      <div style="grid-column: span 5"></div>
-    </div>
-  </div>
-
   <div class="card" style="margin-top:10px">
     <div class="tabsbar">
       <div class="tabs" id="tabs"></div>
@@ -1228,22 +1219,22 @@ document.addEventListener('keydown', (e)=>{
   /* ======== CONTEXT MENU ======== */
   const ctx = document.getElementById('ctx');
   function showCtx(x,y){
-  ctx.style.left = x+'px';
-  ctx.style.top  = y+'px';
+  ctx.removeAttribute('inert');
   ctx.style.display = 'block';
   ctx.setAttribute('aria-hidden','false');
-  ctx.querySelector('.itm')?.focus(); // ok
+  ctx.querySelector('.itm')?.focus();
 }
-  function hideCtx(){
-  // se qualcosa dentro #ctx ha il focus, spostalo via
+
+function hideCtx(){
   if (ctx.contains(document.activeElement)) {
-    try {
-      document.activeElement.blur();
-    } catch(_) {}
-    // rimetti il focus su qualcosa di “sicuro”
-    const fallback = state.anchorCell?.querySelector('input') || document.body;
-    try { fallback.focus(); } catch(_) {}
+    document.activeElement.blur();
+    (state.anchorCell?.querySelector('input') || document.body).focus();
   }
+  ctx.setAttribute('inert','');
+  ctx.style.display = 'none';
+  ctx.setAttribute('aria-hidden','true');
+  state.ctxTarget = null;
+}
   ctx.style.display = 'none';
   ctx.setAttribute('aria-hidden','true');
   state.ctxTarget = null;
