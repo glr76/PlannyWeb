@@ -1235,10 +1235,6 @@ function hideCtx(){
   ctx.setAttribute('aria-hidden','true');
   state.ctxTarget = null;
 }
-  ctx.style.display = 'none';
-  ctx.setAttribute('aria-hidden','true');
-  state.ctxTarget = null;
-}
 
     document.addEventListener('contextmenu', (e)=>{
     const inInput = e.target.closest?.('.cell.editing input');
