@@ -1048,7 +1048,7 @@
 16-10-2025,Alfredo,Assente
 16-10-2025,Fabrizio,Ferie
 16-10-2025,Gabriele,TS1
-16-10-2025,Lorenzo,h
+16-10-2025,Lorenzo,__DEL__
 16-10-2025,Raffaele,MP9235
 17-10-2025,Alfredo,Assente
 17-10-2025,Gabriele,TS1
