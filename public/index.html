@@ -130,6 +130,12 @@ td, th {padding: 2px 4px;}
 <body>
 <div class="wrap">
   <h1>Planny (HTML)</h1>
+  
+<div id="auth-bar" style="display:flex;gap:.5rem;align-items:center;justify-content:flex-end;padding:.5rem 1rem;border-bottom:1px solid #eee;margin-bottom:8px">
+  <span id="auth-status">👤 ospite</span>
+  <button id="btn-login">Login</button>
+  <button id="btn-logout" style="display:none">Logout</button>
+</div>
 
   <div class="card">
     <div class="bar">
@@ -304,7 +310,7 @@ async function putTextToServer(filename, text, {timeoutMs=15000} = {}){
   const ctrl = new AbortController();
   const to = setTimeout(()=>ctrl.abort('timeout'), timeoutMs);
   try{
-    const res = await fetch(`/api/files/public/${filename}`, {
+    const res = await guardedFetch(`/api/files/public/${filename}`, {
       method: 'PUT',
       headers: {'Content-Type':'text/plain; charset=utf-8'},
       body: text,
@@ -313,11 +319,11 @@ async function putTextToServer(filename, text, {timeoutMs=15000} = {}){
     });
     const body = await res.text().catch(()=> '');
     if(!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} ${body ? '- '+body : ''}`);
-    // bust per i GET successivi
     window.__fileVersion[filename] = Date.now();
     return body;
   } finally { clearTimeout(to); }
 }
+
   async function getTextFromServer(filename){
   const ver = window.__fileVersion?.[filename] || Date.now();
   const url = `/api/files/public/${filename}?v=${ver}`;
@@ -359,6 +365,10 @@ function logsChunkSinceCursor(){
 }
 
 async function appendLogsToServer(opts={force:false}){
+	if (!window.__canWrite) {
+    log('Permessi insufficienti: effettua il login come admin per salvare.', 'warn');
+    return;
+  }
   const year = state.year;
   const name = `planny_log_${year}.txt`;
 
@@ -423,6 +433,10 @@ async function appendLogsToServer(opts={force:false}){
 }
 
 async function saveSelectionsToServer(){
+	if (!window.__canWrite) {
+    log('Permessi insufficienti: effettua il login come admin per salvare.', 'warn');
+    return;
+  }
   const name = selectionsFileName();
   if (__saveInFlight){ __saveQueued = true; return; }
   __saveInFlight = true;
@@ -484,16 +498,16 @@ async function saveSelectionsToServer(){
   async function saveFestiviToServer(year, lines){
   const name = `festivi_${year}.txt`;
   const payload = lines.join('\n') + '\n';
-  // server-only: un unico PUT, nessun fallback locale
-  const res = await fetch(`/api/files/public/${encodeURIComponent(name)}`, {
+  const res = await guardedFetch(`/api/files/public/${encodeURIComponent(name)}`, {
     method: 'PUT',
     headers: {'Content-Type':'text/plain;charset=utf-8'},
     body: payload,
     cache: 'no-store'
   });
-  if(!res.ok) throw new Error('HTTP ' + res.status);
+  if(!res.ok) return; // alert già mostrato da guardedFetch su 401/403
   log('Festivi salvati su server: ' + name, 'ok');
 }
+
 
 
   // Espongo importer selections per year_single_selector.js
@@ -1593,6 +1607,81 @@ document.addEventListener('keydown', (e)=>{
 
   window.__SaveTracker = SaveTracker;
 })();
+</script>
+<script>
+async function apiMe(){
+  const r = await fetch('/me', {credentials:'same-origin'});
+  return r.ok ? r.json() : {ok:false};
+}
+async function apiLogin(username, password){
+  const r = await fetch('/login', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    credentials:'same-origin',
+    body: JSON.stringify({username, password})
+  });
+  return r.json();
+}
+async function apiLogout(){
+  const r = await fetch('/logout', {method:'POST', credentials:'same-origin'});
+  return r.json();
+}
+
+// abilita/disabilita (se li hai) bottoni di salvataggio
+function setWriteEnabled(canWrite){
+  window.__canWrite = !!canWrite;
+  const saveButtons = document.querySelectorAll('[data-role="save"], .btn-save, #btnSave, #btnSaveFestivi, #btnSaveSelections');
+  saveButtons.forEach(b => b && (b.disabled = !canWrite));
+}
+
+// wrapper per intercettare 401/403 sulle PUT
+async function guardedFetch(url, opts){
+  const res = await fetch(url, {...opts, credentials:'same-origin'});
+  if (res.status === 401){
+    alert('Devi effettuare il login per salvare.');
+  } else if (res.status === 403){
+    alert('Non hai i permessi per salvare (solo admin può scrivere).');
+  }
+  return res;
+}
+
+// barra login/logout
+async function refreshAuthBar(){
+  try{
+    const me = await apiMe();
+    const s = document.getElementById('auth-status');
+    const btnLogin = document.getElementById('btn-login');
+    const btnLogout = document.getElementById('btn-logout');
+    const canWrite = me?.role === 'write';
+    s.textContent = me?.user ? `👋 ${me.user} (${me.role})` : '👤 ospite';
+    btnLogin.style.display  = me?.user ? 'none' : '';
+    btnLogout.style.display = me?.user ? '' : 'none';
+    setWriteEnabled(canWrite);
+  }catch(_){}
+}
+
+window.addEventListener('DOMContentLoaded', ()=>{
+  const btnLogin = document.getElementById('btn-login');
+  const btnLogout = document.getElementById('btn-logout');
+  if(btnLogin){
+    btnLogin.addEventListener('click', async ()=>{
+      const username = prompt('Username (admin o user)');
+      if (!username) return;
+      const password = prompt('Password (admin123 o user123)');
+      if (!password) return;
+      const j = await apiLogin(username, password);
+      if (!j.ok){ alert(j.error || 'Login fallito'); return; }
+      await refreshAuthBar();
+    });
+  }
+  if(btnLogout){
+    btnLogout.addEventListener('click', async ()=>{
+      await apiLogout();
+      await refreshAuthBar();
+    });
+  }
+  refreshAuthBar();
+});
 </script>
 
 </body>
