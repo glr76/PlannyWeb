@@ -1357,10 +1357,10 @@ document.addEventListener('keydown', (e)=>{
         if(ini['Linac']?.['options']) $('#options').value=ini['Linac']['options'];
       }
       if(!$('#year').value){
-        const cfgTxt = await getTextFromServer('config.txt');
+        const cfgTxt = await getTextFromServer('config.ini');
         if(cfgTxt){
           const y = parseYearFromConfigTxt(cfgTxt);
-          if(y){ $('#year').value = y; log('Anno letto da config.txt: '+y,'ok'); }
+          if(y){ $('#year').value = y; log('Anno letto da config.ini: '+y,'ok'); }
         }
       }
       state.year=parseInt($('#year').value || (new Date().getFullYear()+1),10);
@@ -1412,8 +1412,8 @@ document.addEventListener('keydown', (e)=>{
 </style>
 <script>
 (function(){
-  const API = '/api/files/';
-  const CFG = ['config.ini','config.txt'];
+  const API = '/api/files/public';
+  const CFG = ['config.ini'];
   const bust = () => '?ts=' + Date.now();
   const fname = y => `selections_${String(y).trim()}.txt`;
 
