@@ -126,16 +126,25 @@ td, th {padding: 2px 4px;}
 #calendar-container {margin-left:0;margin-right:0;padding-left:4px;padding-right:4px;max-width:100%;}
 #calendar {margin-left:0;margin-right:0;}
 </style>
+<style>
+
+/* Allinea a sinistra il box "Anno … selections_*.txt" */
+.cloud-year-box{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  justify-content:flex-start;
+  text-align:left !important;
+  margin-left:0 !important;
+  margin-right:auto !important;
+}
+.cloud-year-box *{ text-align:left !important; }
+
+</style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Planny</h1>
-  
-<div id="auth-bar" style="display:flex;gap:.5rem;align-items:center;justify-content:flex-end;padding:.5rem 1rem;border-bottom:1px solid #eee;margin-bottom:8px">
-  <span id="auth-status">👤 ospite</span>
-  <button id="btn-login">Login</button>
-  <button id="btn-logout" style="display:none">Logout</button>
-</div>
+  <h1>Planny (HTML)</h1>
 
   <div class="card">
     <div class="bar">
@@ -310,7 +319,7 @@ async function putTextToServer(filename, text, {timeoutMs=15000} = {}){
   const ctrl = new AbortController();
   const to = setTimeout(()=>ctrl.abort('timeout'), timeoutMs);
   try{
-    const res = await guardedFetch(`/api/files/public/${filename}`, {
+    const res = await fetch(`/api/files/${filename}`, {
       method: 'PUT',
       headers: {'Content-Type':'text/plain; charset=utf-8'},
       body: text,
@@ -319,14 +328,14 @@ async function putTextToServer(filename, text, {timeoutMs=15000} = {}){
     });
     const body = await res.text().catch(()=> '');
     if(!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} ${body ? '- '+body : ''}`);
+    // bust per i GET successivi
     window.__fileVersion[filename] = Date.now();
     return body;
   } finally { clearTimeout(to); }
 }
-
   async function getTextFromServer(filename){
   const ver = window.__fileVersion?.[filename] || Date.now();
-  const url = `/api/files/public/${filename}?v=${ver}`;
+  const url = `/api/files/${filename}?v=${ver}`;
   const res = await fetch(url, {
     cache: 'no-store',
     headers: {
@@ -365,10 +374,6 @@ function logsChunkSinceCursor(){
 }
 
 async function appendLogsToServer(opts={force:false}){
-	if (!window.__canWrite) {
-    log('Permessi insufficienti: effettua il login come admin per salvare.', 'warn');
-    return;
-  }
   const year = state.year;
   const name = `planny_log_${year}.txt`;
 
@@ -433,10 +438,6 @@ async function appendLogsToServer(opts={force:false}){
 }
 
 async function saveSelectionsToServer(){
-	if (!window.__canWrite) {
-    log('Permessi insufficienti: effettua il login come admin per salvare.', 'warn');
-    return;
-  }
   const name = selectionsFileName();
   if (__saveInFlight){ __saveQueued = true; return; }
   __saveInFlight = true;
@@ -498,16 +499,16 @@ async function saveSelectionsToServer(){
   async function saveFestiviToServer(year, lines){
   const name = `festivi_${year}.txt`;
   const payload = lines.join('\n') + '\n';
-  const res = await guardedFetch(`/api/files/public/${encodeURIComponent(name)}`, {
+  // server-only: un unico PUT, nessun fallback locale
+  const res = await fetch(`/api/files/${encodeURIComponent(name)}`, {
     method: 'PUT',
     headers: {'Content-Type':'text/plain;charset=utf-8'},
     body: payload,
     cache: 'no-store'
   });
-  if(!res.ok) return; // alert già mostrato da guardedFetch su 401/403
+  if(!res.ok) throw new Error('HTTP ' + res.status);
   log('Festivi salvati su server: ' + name, 'ok');
 }
-
 
 
   // Espongo importer selections per year_single_selector.js
@@ -1371,10 +1372,10 @@ document.addEventListener('keydown', (e)=>{
         if(ini['Linac']?.['options']) $('#options').value=ini['Linac']['options'];
       }
       if(!$('#year').value){
-        const cfgTxt = await getTextFromServer('config.ini');
+        const cfgTxt = await getTextFromServer('config.txt');
         if(cfgTxt){
           const y = parseYearFromConfigTxt(cfgTxt);
-          if(y){ $('#year').value = y; log('Anno letto da config.ini: '+y,'ok'); }
+          if(y){ $('#year').value = y; log('Anno letto da config.txt: '+y,'ok'); }
         }
       }
       state.year=parseInt($('#year').value || (new Date().getFullYear()+1),10);
@@ -1426,8 +1427,8 @@ document.addEventListener('keydown', (e)=>{
 </style>
 <script>
 (function(){
-  const API = '/api/files/public/';
-  const CFG = ['config.ini'];
+  const API = '/api/files/';
+  const CFG = ['config.ini','config.txt'];
   const bust = () => '?ts=' + Date.now();
   const fname = y => `selections_${String(y).trim()}.txt`;
 
@@ -1608,100 +1609,65 @@ document.addEventListener('keydown', (e)=>{
   window.__SaveTracker = SaveTracker;
 })();
 </script>
+
+
 <script>
 async function apiMe(){
   const r = await fetch('/me', {credentials:'same-origin'});
   return r.ok ? r.json() : {ok:false};
 }
-async function apiLogin(username, password){
-  const r = await fetch('/login', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    credentials:'same-origin',
-    body: JSON.stringify({username, password})
-  });
-  return r.json();
-}
 async function apiLogout(){
-  const r = await fetch('/logout', {method:'POST', credentials:'same-origin'});
-  return r.json();
+  await fetch('/logout', {method:'POST', credentials:'same-origin'});
 }
-
-// abilita/disabilita (se li hai) bottoni di salvataggio
-function setWriteEnabled(canWrite){
-  window.__canWrite = !!canWrite;
-  const saveButtons = document.querySelectorAll('[data-role="save"], .btn-save, #btnSave, #btnSaveFestivi, #btnSaveSelections');
-  saveButtons.forEach(b => b && (b.disabled = !canWrite));
-}
-
-// wrapper per intercettare 401/403 sulle PUT
-async function guardedFetch(url, opts){
-  const res = await fetch(url, {...opts, credentials:'same-origin'});
-  if (res.status === 401){
-    alert('Devi effettuare il login per salvare.');
-  } else if (res.status === 403){
-    alert('Non hai i permessi per salvare (solo admin può scrivere).');
-  }
-  return res;
-}
-
-<!-- barra login/logout + wiring -->
-<script>
-// barra login/logout
+function setWriteEnabled(ok){ window.__canWrite = !!ok; }
 async function refreshAuthBar(){
-  try {
+  try{
     const me = await apiMe();
     const s = document.getElementById('auth-status');
-    const btnLogin = document.getElementById('btn-login');
+    const btnLogin  = document.getElementById('btn-login');
     const btnLogout = document.getElementById('btn-logout');
-    const canWrite = me && me.ok && me.role === 'write';
-
-    if (me && me.ok && me.user){
-      s.textContent = `👋 ${me.user} (${me.role})`;
+    const canWrite = me?.role === 'write';
+    window.__canWrite = !!canWrite;
+    if (typeof setWriteEnabled==='function') setWriteEnabled(!!canWrite);
+    if (me?.user){
+      if (s) s.textContent = `👋 ${me.user} (${me.role||'read'})`;
       if (btnLogin)  btnLogin.style.display  = 'none';
       if (btnLogout) btnLogout.style.display = 'inline-block';
     } else {
-      s.textContent = '👤 ospite';
+      if (s) s.textContent = '👤 ospite';
       if (btnLogin)  btnLogin.style.display  = 'inline-block';
       if (btnLogout) btnLogout.style.display = 'none';
     }
-    setWriteEnabled(!!canWrite);
-  } catch(e){
-    console.warn('auth refresh failed', e);
-  }
+  }catch(e){ console.warn('auth refresh failed', e); }
 }
-
-window.addEventListener('DOMContentLoaded', ()=>{
-  const btnLogin = document.getElementById('btn-login');
+window.addEventListener('DOMContentLoaded', async ()=>{
+  const btnLogin  = document.getElementById('btn-login');
   const btnLogout = document.getElementById('btn-logout');
-
   if (btnLogin){
     btnLogin.addEventListener('click', async ()=>{
       const password = prompt('Password admin:');
       if (!password) return;
       const res = await fetch('/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        credentials:'same-origin',
         body: JSON.stringify({ password })
       });
       const j = await res.json().catch(()=>({ok:false}));
       if (!j.ok){ alert(j.error || 'Login fallito'); return; }
+      window.__canWrite = true; if (typeof setWriteEnabled==='function') setWriteEnabled(true);
       await refreshAuthBar();
     });
   }
-
   if (btnLogout){
     btnLogout.addEventListener('click', async ()=>{
-      await fetch('/logout', { method:'POST', credentials:'same-origin' });
+      await apiLogout();
       await refreshAuthBar();
     });
   }
-
-  refreshAuthBar();
+  await refreshAuthBar();
 });
 </script>
 
 </body>
 </html>
-
