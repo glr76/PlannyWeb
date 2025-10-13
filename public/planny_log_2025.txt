@@ -556,3 +556,5 @@
 [15:25:50] MOVE 16-10-2025, Lorenzo,ippo → 16-10-2025, Giuseppe
 [10/13/2025, 3:26:50 PM] Sessione avviata su https://plannyweb.onrender.com/
 [10/13/2025, 3:47:26 PM] Sessione avviata su https://plannyweb.onrender.com/
+[3:54:16 PM] DELETE 16-10-2025, Giuseppe,ippo
+[3:54:16 PM] Celle cancellate.
