@@ -293,27 +293,37 @@ def healthz():
 # STATIC (/public) – serviti dal repo
 # ----------------------------------------------------
 @app.get("/")
+@app.get("/")
 def index():
-    ix = os.path.join(PUBLIC_DIR, "index.html")
-    if not os.path.exists(ix):
+    try:
+        # usa il meccanismo built-in di Flask per la static_folder
+        resp = app.send_static_file("index.html")
+        resp.cache_control.no_store = True
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
+        return resp
+    except FileNotFoundError:
         return "index.html non trovato in /public", 404
-    resp = send_from_directory(PUBLIC_DIR, "index.html", cache_timeout=0)
-    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-    resp.headers["Pragma"] = "no-cache"
-    resp.headers["Expires"] = "0"
-    return resp
+    except Exception as e:
+        log.error(f"[index] static error: {e}")
+        return "Internal error serving index.html", 500
+
 
 @app.get("/<path:asset>")
+@app.get("/<path:asset>")
 def static_files(asset):
-    path = os.path.join(PUBLIC_DIR, asset)
-    if not os.path.exists(path):
+    try:
+        resp = send_from_directory(PUBLIC_DIR, asset, cache_timeout=0)
+        resp.cache_control.no_store = True
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
+        return resp
+    except FileNotFoundError:
         abort(404)
-    directory, fname = os.path.split(path)
-    resp = send_from_directory(directory, fname, cache_timeout=0)
-    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-    resp.headers["Pragma"] = "no-cache"
-    resp.headers["Expires"] = "0"
-    return resp
+    except Exception as e:
+        log.error(f"[static] error for '{asset}': {e}")
+        return "Internal error serving static asset", 500
+
 
 
 # ----------------------------------------------------
