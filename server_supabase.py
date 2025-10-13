@@ -67,7 +67,7 @@ def _upload_text(path: str, content: str):
         "contentType": "text/plain; charset=utf-8",
         # molte versioni di supabase-py accettano 'upsert' e 'cacheControl' qui
         "upsert": True,
-        "cacheControl": "no-store",
+        "cacheControl": "0",
     }
 
     # 1) Tenta UPDATE (se esiste giÃ )
