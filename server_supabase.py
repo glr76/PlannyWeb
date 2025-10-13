@@ -1,13 +1,15 @@
-# server_supabase.py
+# server_supabase.py — Flask + GitHub Contents API (read/write .txt)
 import os
-import io
+import time
+import json
+import base64
 import logging
 import traceback
 from hashlib import sha256
 
+import requests
 from flask import Flask, request, send_from_directory, Response, jsonify, abort, make_response
 from flask_cors import CORS
-from supabase import create_client, Client
 
 # ----------------------------------------------------
 # Config
@@ -15,16 +17,12 @@ from supabase import create_client, Client
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 PUBLIC_DIR = os.path.join(BASE_DIR, "public")
 
-SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
-# Preferisci la Service Role (due nomi possibili), altrimenti fallback a ANON
-SUPABASE_KEY = (
-    os.environ.get("SUPABASE_SERVICE_ROLE")
-    or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-    or os.environ["SUPABASE_ANON_KEY"]
-)
-BUCKET = os.environ.get("SUPABASE_BUCKET", "planny-txt")
-
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+GITHUB_REPO   = os.environ.get("GITHUB_REPO", "").strip()          # es. "glr76/PlannyWeb"
+GITHUB_BRANCH = os.environ.get("GITHUB_BRANCH", "main").strip()
+GITHUB_TOKEN  = os.environ.get("GITHUB_TOKEN", "").strip()
+if not GITHUB_REPO:
+    raise RuntimeError("Set GITHUB_REPO (es. 'utente/repo') nelle ENV")
+_GH_API = "https://api.github.com"
 
 app = Flask(__name__, static_folder=PUBLIC_DIR, static_url_path="/static")
 CORS(app, resources={r"/api/*": {"origins": "*"}})
@@ -34,10 +32,22 @@ log = app.logger
 
 
 # ----------------------------------------------------
-# Helpers Storage
+# Helpers di base
 # ----------------------------------------------------
+def _nocache_headers(extra: dict | None = None) -> dict:
+    h = {
+        "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+        "X-Content-Type-Options": "nosniff",
+        "X-Debug-Source": "render-flask",
+        "X-Debug-Time": time.strftime("%H:%M:%S"),
+    }
+    if extra:
+        h.update(extra)
+    return h
+
 def _sanitize(name: str) -> str:
-    """Evita percorsi strani e normalizza gli slash."""
     name = (name or "").strip().replace("\\", "/")
     while "//" in name:
         name = name.replace("//", "/")
@@ -47,56 +57,109 @@ def _sanitize(name: str) -> str:
         raise ValueError("Invalid path")
     return name
 
+def _sha(txt: str) -> str:
+    return sha256((txt or "").encode("utf-8")).hexdigest()
 
+
+# ----------------------------------------------------
+# GitHub Contents API helpers
+# ----------------------------------------------------
+def _gh_headers():
+    h = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "planny-server/1.0",
+    }
+    if GITHUB_TOKEN:
+        h["Authorization"] = f"Bearer {GITHUB_TOKEN}"
+    return h
+
+def _gh_get_file(path: str) -> tuple[str, str | None]:
+    """
+    Ritorna (content_text, sha) se il file esiste, altrimenti ("", None).
+    """
+    url = f"{_GH_API}/repos/{GITHUB_REPO}/contents/{path}"
+    r = requests.get(url, headers=_gh_headers(), params={"ref": GITHUB_BRANCH}, timeout=20)
+    if r.status_code == 200:
+        j = r.json()
+        b64 = (j.get("content") or "").encode()
+        # la Contents API può aggiungere newline al base64: rimuovili prima del decode
+        content = base64.b64decode(b64.replace(b"\n", b"")).decode("utf-8", "replace")
+        return content, j.get("sha")
+    if r.status_code == 404:
+        return "", None
+    raise RuntimeError(f"GitHub GET {r.status_code}: {r.text[:200]}")
+
+def _gh_put_file(path: str, content: str, sha: str | None) -> str:
+    """
+    Crea/aggiorna un file nel repo (branch configurato).
+    Se 'sha' è None fa create, altrimenti update.
+    Ritorna la sha del nuovo blob.
+    """
+    url = f"{_GH_API}/repos/{GITHUB_REPO}/contents/{path}"
+    payload = {
+        "message": f"update {path} via API",
+        "content": base64.b64encode(content.encode("utf-8")).decode(),
+        "branch": GITHUB_BRANCH,
+    }
+    if sha:
+        payload["sha"] = sha
+    r = requests.put(url, headers=_gh_headers(), data=json.dumps(payload), timeout=30)
+    if r.status_code in (200, 201):
+        j = r.json()
+        return (j.get("content") or {}).get("sha", "")
+    if r.status_code == 409:
+        # conflitto: il file è cambiato mentre stavi salvando
+        raise RuntimeError("Git conflict (409): il file è stato aggiornato da un altro commit. Ricarica e riprova.")
+    raise RuntimeError(f"GitHub PUT {r.status_code}: {r.text[:300]}")
+
+def _gh_list(prefix: str = "") -> list[dict]:
+    """
+    Lista file nella directory 'prefix' (solo primo livello).
+    Ritorna: [{name, path, sha, type}, ...]
+    """
+    url = f"{_GH_API}/repos/{GITHUB_REPO}/contents/{prefix}"
+    r = requests.get(url, headers=_gh_headers(), params={"ref": GITHUB_BRANCH}, timeout=20)
+    if r.status_code == 200:
+        items = r.json()
+        out = []
+        for it in items:
+            if it.get("type") == "file":
+                out.append({"name": it.get("name"), "path": it.get("path"), "sha": it.get("sha"), "type": "file"})
+        return out
+    if r.status_code == 404:
+        return []
+    raise RuntimeError(f"GitHub LIST {r.status_code}: {r.text[:200]}")
+
+# Wrapper I/O usato dalle route
 def _download_text(path: str) -> str:
     try:
-        data = supabase.storage.from_(BUCKET).download(path)
-        return data.decode("utf-8", "replace")
+        txt, _cur_sha = _gh_get_file(path)
+        return txt
     except Exception as e:
-        log.warning(f"[download] fail '{path}': {e}")
+        log.warning(f"[download-gh] fail '{path}': {e}")
         return ""
 
-
 def _upload_text(path: str, content: str):
-    """
-    Scrive il file assicurando metadata anti-cache nel bucket.
-    Tenta update; se fallisce, fa upload (creazione).
-    """
-    data_bytes = content.encode("utf-8")
-    file_opts = {
-        "contentType": "text/plain; charset=utf-8",
-        # molte versioni di supabase-py accettano 'upsert' e 'cacheControl' qui
-        "upsert": True,
-        "cacheControl": "0",
-    }
-
-    # 1) Tenta UPDATE (se esiste giÃ )
     try:
-        # alcune versioni consentono opzioni anche su update; se non supportato non Ã¨ fatale
-        supabase.storage.from_(BUCKET).update(path, data_bytes, file_opts)  # type: ignore[arg-type]
-        return
+        _current, cur_sha = _gh_get_file(path)     # prendi sha corrente (se c'è)
+        new_sha = _gh_put_file(path, content, cur_sha)
+        log.info(f"[upload-gh] wrote '{path}' sha={new_sha[:8] if new_sha else 'unknown'}")
     except Exception as e:
-        log.info(f"[update] miss '{path}' -> try upload: {e}")
-
-    # 2) Fallback: UPLOAD (crea o sovrascrive con upsert=True)
-    try:
-        supabase.storage.from_(BUCKET).upload(path, data_bytes, file_opts)  # type: ignore[arg-type]
-        return
-    except Exception as e:
-        log.error(f"[upload] fail '{path}': {e}\n{traceback.format_exc()}")
+        log.error(f"[upload-gh] fail '{path}': {e}\n{traceback.format_exc()}")
         raise
 
 
-def _nocache_headers(extra: dict | None = None) -> dict:
-    h = {
-        "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate",
-        "Pragma": "no-cache",
-        "Expires": "0",
-        "X-Content-Type-Options": "nosniff",
-    }
-    if extra:
-        h.update(extra)
-    return h
+# ----------------------------------------------------
+# Error handler (JSON per /api/*)
+# ----------------------------------------------------
+@app.errorhandler(Exception)
+def _on_error(e):
+    if request.path.startswith("/api/"):
+        log.error(f"[unhandled] {e}\n{traceback.format_exc()}")
+        return jsonify(ok=False, error=str(e)), 500
+    # per le pagine non-API lascia che Flask mostri l'errore standard
+    raise e
 
 
 # ----------------------------------------------------
@@ -104,53 +167,35 @@ def _nocache_headers(extra: dict | None = None) -> dict:
 # ----------------------------------------------------
 @app.get("/api/files/text/<path:name>")
 def api_text_get(name: str):
-    try:
-        fname = _sanitize(name)
-        txt = _download_text(fname)
-        status = 200 if txt != "" else 404
-        etag = sha256((txt or "").encode("utf-8")).hexdigest()
-        headers = _nocache_headers({"ETag": f'W/"{etag}"'})
-        resp = make_response(jsonify(ok=(status == 200), name=fname, text=txt), status)
-        for k, v in headers.items():
-            resp.headers[k] = v
-        return resp
-    except Exception as e:
-        log.error(f"[GET json] '{name}': {e}\n{traceback.format_exc()}")
-        return jsonify(ok=False, error=str(e)), 500
-
+    fname = _sanitize(name)
+    txt = _download_text(fname)
+    status = 200 if txt != "" else 404
+    etag = _sha(txt)
+    headers = _nocache_headers({"ETag": f'W/"{etag}"'})
+    resp = make_response(jsonify(ok=(status == 200), name=fname, text=txt), status)
+    for k, v in headers.items():
+        resp.headers[k] = v
+    return resp
 
 @app.put("/api/files/text/<path:name>")
 def api_text_put(name: str):
-    try:
-        fname = _sanitize(name)
-        raw = request.get_data(as_text=True) or ""
-
-        # 1) scrivi
-        _upload_text(fname, raw)
-
-        # 2) rileggi subito dal bucket (sorgente-veritÃ )
-        echoed = _download_text(fname)
-
-        # 3) risposta JSON con echo e SHA per verifica forte
-        payload = {
-            "ok": True,
-            "name": fname,
-            "size": len(raw),
-            "echo": echoed,
-            "sha_in": sha256(raw.encode("utf-8")).hexdigest(),
-            "sha_echo": sha256((echoed or "").encode("utf-8")).hexdigest(),
-        }
-
-        # 4) headers no-cache anche sulla risposta PUT
-        headers = _nocache_headers({"ETag": f'W/"{payload["sha_echo"]}"'})
-        resp = make_response(jsonify(payload), 200)
-        for k, v in headers.items():
-            resp.headers[k] = v
-        return resp
-
-    except Exception as e:
-        log.error(f"[PUT json] '{name}': {e}\n{traceback.format_exc()}")
-        return jsonify(ok=False, error=str(e)), 500
+    fname = _sanitize(name)
+    raw = request.get_data(as_text=True) or ""
+    _upload_text(fname, raw)
+    echoed = _download_text(fname)  # Contents API restituisce subito l'ultima versione
+    payload = {
+        "ok": True,
+        "name": fname,
+        "size": len(raw),
+        "echo": echoed,
+        "sha_in": _sha(raw),
+        "sha_echo": _sha(echoed),
+    }
+    headers = _nocache_headers({"ETag": f'W/"{payload["sha_echo"]}"'})
+    resp = make_response(jsonify(payload), 200)
+    for k, v in headers.items():
+        resp.headers[k] = v
+    return resp
 
 
 # ----------------------------------------------------
@@ -158,71 +203,47 @@ def api_text_put(name: str):
 # ----------------------------------------------------
 @app.get("/api/files/<path:name>")
 def api_read_text_legacy(name: str):
-    try:
-        fname = _sanitize(name)
-        txt = _download_text(fname)
-        if txt == "":
-            # anche 404 deve avere no-cache
-            return Response(
-                "",
-                status=404,
-                mimetype="text/plain; charset=utf-8",
-                headers=_nocache_headers(),
-            )
-        etag = sha256(txt.encode("utf-8")).hexdigest()
-        headers = _nocache_headers({
-            "ETag": f'W/"{etag}"',
-            "Content-Disposition": f'inline; filename="{os.path.basename(fname)}"',
-        })
-        return Response(txt, mimetype="text/plain; charset=utf-8", headers=headers)
-    except Exception as e:
-        log.error(f"[GET legacy] '{name}': {e}\n{traceback.format_exc()}")
-        return Response("error", status=500, mimetype="text/plain; charset=utf-8", headers=_nocache_headers())
-
+    fname = _sanitize(name)
+    txt = _download_text(fname)
+    if txt == "":
+        return Response("", status=404, mimetype="text/plain; charset=utf-8", headers=_nocache_headers())
+    etag = _sha(txt)
+    headers = _nocache_headers({
+        "ETag": f'W/"{etag}"',
+        "Content-Disposition": f'inline; filename="{os.path.basename(fname)}"',
+    })
+    return Response(txt, mimetype="text/plain; charset=utf-8", headers=headers)
 
 @app.put("/api/files/<path:name>")
 def api_write_text_legacy(name: str):
-    try:
-        fname = _sanitize(name)
-        raw = request.get_data(as_text=True) or ""
-        _upload_text(fname, raw)
-        echoed = _download_text(fname)
-        payload = {
-            "ok": True,
-            "path": fname,
-            "size": len(raw),
-            "sha_in": sha256(raw.encode("utf-8")).hexdigest(),
-            "sha_echo": sha256((echoed or "").encode("utf-8")).hexdigest(),
-        }
-        # no-cache anche qui
-        resp = make_response(jsonify(payload), 200)
-        for k, v in _nocache_headers({"ETag": f'W/"{payload["sha_echo"]}"'}).items():
-            resp.headers[k] = v
-        return resp
-    except Exception as e:
-        log.error(f"[PUT legacy] '{name}': {e}\n{traceback.format_exc()}")
-        return jsonify(ok=False, error=str(e)), 500
+    fname = _sanitize(name)
+    raw = request.get_data(as_text=True) or ""
+    _upload_text(fname, raw)
+    echoed = _download_text(fname)
+    payload = {
+        "ok": True,
+        "path": fname,
+        "size": len(raw),
+        "sha_in": _sha(raw),
+        "sha_echo": _sha(echoed),
+    }
+    resp = make_response(jsonify(payload), 200)
+    for k, v in _nocache_headers({"ETag": f'W/"{payload["sha_echo"]}"'}).items():
+        resp.headers[k] = v
+    return resp
 
 
 # ----------------------------------------------------
-# LIST + HEALTH + STUB EXPORT
+# LIST + HEALTH
 # ----------------------------------------------------
 @app.get("/api/files/list")
 def api_list_files():
     try:
-        items = supabase.storage.from_(BUCKET).list("", {"limit": 1000})
-        files = [{"name": it.get("name"), "updated_at": it.get("updated_at")} for it in items]
-        return jsonify(ok=True, bucket=BUCKET, count=len(files), files=files)
+        files = _gh_list("")  # root del repo; usa "public" se vuoi solo quella cartella
+        return jsonify(ok=True, source="github", count=len(files), files=files)
     except Exception as e:
         log.error(f"[LIST] {e}\n{traceback.format_exc()}")
         return jsonify(ok=False, error=str(e)), 500
-
-
-@app.post("/api/export/xlsx/save")
-def api_export_xlsx_save():
-    # Stub per evitare 404 finché l'export non serve
-    return jsonify(ok=True, skipped=True, reason="xlsx export disabled")
-
 
 @app.get("/healthz")
 def healthz():
@@ -230,24 +251,30 @@ def healthz():
 
 
 # ----------------------------------------------------
-# STATIC (/public) - dichiarato DOPO le API per non interferire
+# STATIC (/public) – serviti dal repo
 # ----------------------------------------------------
 @app.get("/")
 def index():
     ix = os.path.join(PUBLIC_DIR, "index.html")
     if not os.path.exists(ix):
         return "index.html non trovato in /public", 404
-    return send_from_directory(PUBLIC_DIR, "index.html")
-
+    resp = send_from_directory(PUBLIC_DIR, "index.html", cache_timeout=0)
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 @app.get("/<path:asset>")
 def static_files(asset):
-    # NON si occupa di /api/... (quelle route hanno la precedenza)
     path = os.path.join(PUBLIC_DIR, asset)
     if not os.path.exists(path):
         abort(404)
     directory, fname = os.path.split(path)
-    return send_from_directory(directory, fname)
+    resp = send_from_directory(directory, fname, cache_timeout=0)
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 
 # ----------------------------------------------------
