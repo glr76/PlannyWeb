@@ -549,3 +549,4 @@
 [10/13/2025, 3:07:24 PM] Sessione avviata su https://plannyweb.onrender.com/
 [3:07:28 PM] MOVE 16-10-2025, Lorenzo,ippo → 16-10-2025, Giuseppe
 [10/13/2025, 3:07:34 PM] Sessione avviata su https://plannyweb.onrender.com/
+[10/13/2025, 3:16:38 PM] Sessione avviata su https://plannyweb.onrender.com/
