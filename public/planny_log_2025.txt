@@ -560,3 +560,4 @@
 [3:54:16 PM] Celle cancellate.
 [10/13/2025, 4:07:05 PM] Sessione avviata su https://plannyweb.onrender.com/
 [4:11:36 PM] SET 16-10-2025, Lorenzo,h
+[10/13/2025, 4:11:43 PM] Sessione avviata su https://plannyweb.onrender.com/
