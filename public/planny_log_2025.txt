@@ -542,3 +542,4 @@
 [10/13/2025, 10:28:20 AM] Sessione avviata su http://127.0.0.1:8000/
 [10/13/2025, 2:45:31 PM] Sessione avviata su https://plannyweb.onrender.com/
 [10/13/2025, 2:45:32 PM] Sessione avviata su https://plannyweb.onrender.com/
+[10/13/2025, 3:01:01 PM] Sessione avviata su https://plannyweb.onrender.com/
