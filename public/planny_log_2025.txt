@@ -1,0 +1,542 @@
+[11:59:09 AM] Autoload…
+[11:59:10 AM] Festivi caricati da festivi_2025.txt: 13 date
+[11:59:10 AM] Selections caricati: 1061 righe
+[11:59:10 AM] Caricato selections_2025.txt
+[11:59:10 AM] Festivi caricati da festivi_2025.txt: 13 date
+[11:59:10 AM] Festivi caricati da festivi_2025.txt: 13 date
+[11:59:28 AM] Festivi caricati da festivi_2025.txt: 13 date
+[12:02:26 PM] Festivi caricati da festivi_2025.txt: 13 date
+[12:02:40 PM] Festivi caricati da festivi_2025.txt: 13 date
+[9/14/2025, 12:05:52 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:05:58 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:06:19 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:06:28 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:12:37 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:12:47 PM] Sessione avviata su http://localhost:8000/
+[12:13:01 PM] UPDATE 12-09-2025, Gabriele,aaa -> l
+[12:13:07 PM] SET 12-09-2025, Michelangelo,oo
+[9/14/2025, 12:13:10 PM] Sessione avviata su http://localhost:8000/
+[12:13:13 PM] DELETE 12-09-2025, Fabrizio,ddd
+[12:13:15 PM] DELETE 12-09-2025, Gabriele,l
+[12:13:17 PM] DELETE 12-09-2025, Michelangelo,oo
+[12:13:21 PM] MOVE 19-09-2025, Fabrizio,TS1 → 19-09-2025, Gabriele
+[12:13:25 PM] MOVE 19-09-2025, Gabriele,TS1 → 19-09-2025, Fabrizio
+[9/14/2025, 12:13:30 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:13:42 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:13:47 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:13:58 PM] Sessione avviata su http://localhost:8000/
+[12:16:58 PM] SET 24-09-2025, Giuseppe,SI7424
+[9/14/2025, 12:18:28 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:18:39 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:18:48 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:19:52 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:20:05 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:20:21 PM] Sessione avviata su http://localhost:8000/
+[12:20:30 PM] SET 25-09-2025, Giuseppe,Ferie
+[9/14/2025, 12:20:33 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:20:42 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:21:29 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:21:37 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:24:17 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:24:25 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:42:26 PM] Sessione avviata su http://localhost:8000/
+[12:42:30 PM] DELETE 24-09-2025, Lorenzo,ttt
+[12:42:30 PM] Celle cancellate.
+[9/14/2025, 12:42:34 PM] Sessione avviata su http://localhost:8000/
+[12:42:39 PM] DELETE 24-09-2025, Fabrizio,hhh
+[12:42:39 PM] Celle cancellate.
+[12:42:42 PM] DELETE 25-09-2025, Giuseppe,Ferie
+[12:42:42 PM] Celle cancellate.
+[9/14/2025, 12:42:45 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:45:10 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:45:12 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:45:18 PM] Sessione avviata su http://localhost:8000/
+[12:45:36 PM] MOVE 24-09-2025, Giuseppe,SI7424 → 24-09-2025, Lorenzo
+[12:45:40 PM] MOVE 24-09-2025, Lorenzo,SI7424 → 24-09-2025, Giuseppe
+[12:45:50 PM] SET 24-09-2025, Lorenzo,jjj
+[12:45:53 PM] MOVE 24-09-2025, Lorenzo,jjj → 24-09-2025, Fabrizio
+[12:45:55 PM] DELETE 24-09-2025, Fabrizio,jjj
+[12:45:55 PM] Celle cancellate.
+[9/14/2025, 12:45:58 PM] Sessione avviata su http://localhost:8000/
+[9/14/2025, 12:45:59 PM] Sessione avviata su http://localhost:8000/
+[09:25:11] NEW 19-09-2025, Gabriele,cass
+[09:25:11] DELETE 24-09-2025, Fabrizio,__DEL__
+[09:25:11] DELETE 24-09-2025, Giuseppe,SI7424
+[9/15/2025, 9:25:12 AM] Sessione avviata su http://127.0.0.1:8000/
+[9:29:46 AM] MOVE 15-09-2025, Michelangelo,TS1 → 15-09-2025, Fabrizio
+[9/15/2025, 10:21:28 AM] Sessione avviata su http://localhost:8000/
+[9/15/2025, 10:21:29 AM] Sessione avviata su http://localhost:8000/
+[4:44:56 PM] DELETE 30-09-2025, Giuseppe,??????
+[4:44:56 PM] Celle cancellate.
+[9/15/2025, 4:45:01 PM] Sessione avviata su http://localhost:8000/
+[9/15/2025, 4:45:03 PM] Sessione avviata su http://localhost:8000/
+[4:45:24 PM] SET 17-09-2025, Giuseppe,SI7424
+[4:46:39 PM] SET 24-09-2025, Gabriele,GR4044
+[6:57:06 PM] MOVE 23-09-2025, Giuseppe,CAR7111 → 23-09-2025, Lorenzo
+[6:57:15 PM] SET 23-09-2025, Giuseppe,GR4044
+[6:57:21 PM] SET 24-09-2025, Giuseppe,GR4044
+[9/17/2025, 1:51:03 PM] Sessione avviata su http://localhost:8000/
+[9/17/2025, 1:51:04 PM] Sessione avviata su http://localhost:8000/
+[1:51:15 PM] SET 22-09-2025, Gabriele,Braky
+[1:51:24 PM] MOVE 18-09-2025, Fabrizio,AR7402 → 18-09-2025, Lorenzo
+[2:36:49 PM] DELETE 17-09-2025, Giuseppe,SI7424
+[2:36:49 PM] Celle cancellate.
+[2:41:30 PM] DELETE 19-09-2025, Gabriele,cass
+[2:41:30 PM] Celle cancellate.
+[2:41:48 PM] SET 19-09-2025, Gabriele,Braky
+[2:42:26 PM] MOVE 19-09-2025, Raffaele,SC9170 → 19-09-2025, Fabio
+[2:42:31 PM] SET 19-09-2025, Raffaele,Braky
+[9/17/2025, 6:12:15 PM] Sessione avviata su http://localhost:8000/
+[9/17/2025, 6:12:16 PM] Sessione avviata su http://localhost:8000/
+[6:32:07 PM] SET 18-09-2025, Fabrizio,in
+[9/18/2025, 7:22:05 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/18/2025, 7:51:04 AM] Sessione avviata su http://localhost:8000/
+[9/18/2025, 7:51:06 AM] Sessione avviata su http://localhost:8000/
+[10:30:01 AM] SET 30-09-2025, Giuseppe,INI4623
+[10:30:06 AM] SET 01-10-2025, Giuseppe,INI4623
+[4:10:55 PM] SET 25-09-2025, Giuseppe,Collocqui
+[4:11:01 PM] UPDATE 25-09-2025, Giuseppe,Collocqui -> Colloqui
+[4:16:37 PM] DELETE 26-09-2025, Raffaele,?PTV9191?
+[4:16:37 PM] Celle cancellate.
+[4:17:26 PM] SET 22-09-2025, Michelangelo,UNITY
+[4:17:27 PM] DELETE 22-09-2025, Raffaele,?PTV9174?
+[4:17:27 PM] Celle cancellate.
+[4:17:55 PM] SET 23-09-2025, Michelangelo,UNITY
+[4:22:08 PM] UPDATE 10-10-2025, Giuseppe,EM4416 -> EM1001
+[4:22:17 PM] UPDATE 24-10-2025, Giuseppe,EM1001 -> EM4416
+[9/21/2025, 9:03:41 AM] Sessione avviata su http://localhost:8000/
+[9/21/2025, 9:03:43 AM] Sessione avviata su http://localhost:8000/
+[9:04:18 AM] SET 24-09-2025, Lorenzo,GR4044
+[9:04:33 AM] SET 22-09-2025, Fabrizio,TS2
+[9:04:38 AM] SET 26-09-2025, Gabriele,TS2
+[9:04:44 AM] SET 24-09-2025, Michelangelo,TS2
+[9:04:48 AM] SET 23-09-2025, Fabrizio,TS2
+[9:04:51 AM] SET 25-09-2025, Lorenzo,TS2
+[9:06:34 AM] SET 26-09-2025, Raffaele,SO7103
+[9:06:42 AM] SET 27-09-2025, Michelangelo,CAM6065
+[9:07:09 AM] UPDATE 22-09-2025, Fabrizio,TS2 -> CAR7111
+[9/22/2025, 3:33:18 PM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 8:59:08 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 8:59:19 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 8:59:22 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 8:59:23 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 8:59:31 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 9:22:51 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 9:22:52 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 9:22:53 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 9:22:54 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 9:23:11 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 10:12:59 AM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 10:13:01 AM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 10:13:06 AM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 10:13:08 AM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 10:13:30 AM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 10:13:31 AM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 10:14:07 AM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 10:14:08 AM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 10:14:34 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 10:14:40 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 10:14:43 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 10:14:44 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 10:14:45 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 10:14:45 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 10:14:46 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 10:14:56 AM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 10:14:57 AM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 10:20:00 AM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 10:20:02 AM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 10:20:16 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 10:20:20 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 10:20:21 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 10:20:23 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 10:21:59 AM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 10:22:01 AM] Sessione avviata su http://localhost:8000/
+[10:22:27 AM] UPDATE 26-09-2025, Gabriele,TS2 -> Ferie
+[10:22:50 AM] SET 26-09-2025, Michelangelo,Braky
+[10:22:54 AM] DELETE 26-09-2025, Michelangelo,Braky
+[10:22:54 AM] Celle cancellate.
+[10:23:01 AM] SET 29-09-2025, Gabriele,Braky
+[10:23:11 AM] SET 29-09-2025, Fabrizio,vi
+[10:23:14 AM] DELETE 29-09-2025, Fabrizio,vi
+[10:23:14 AM] Celle cancellate.
+[10:23:22 AM] SET 29-09-2025, Raffaele,VI7091
+[10:23:26 AM] SET 29-09-2025, Fabio,VI7091
+[10:23:37 AM] SET 30-09-2025, Fabio,VI7091
+[10:23:40 AM] SET 30-09-2025, Raffaele,VI7091
+[10:23:57 AM] SET 30-09-2025, Gabriele,TN4107
+[10:24:11 AM] SET 01-10-2025, Fabio,VI7091
+[10:24:18 AM] SET 01-10-2025, Michelangelo,SC9190
+[10:24:20 AM] DELETE 01-10-2025, Raffaele,SC9190
+[10:24:20 AM] Celle cancellate.
+[10:24:26 AM] SET 01-10-2025, Raffaele,VI7091
+[10:24:46 AM] SET 02-10-2025, Fabio,VI7091
+[10:24:49 AM] MOVE 02-10-2025, Raffaele,AQ2465 → 02-10-2025, Michelangelo
+[10:24:52 AM] MOVE 03-10-2025, Raffaele,AQ6943 → 03-10-2025, Michelangelo
+[10:24:57 AM] SET 02-10-2025, Raffaele,VI7091
+[10:25:23 AM] SET 03-10-2025, Fabio,VI7091
+[10:25:26 AM] SET 03-10-2025, Raffaele,VI7091
+[10:25:40 AM] SET 06-10-2025, Fabio,VI9189
+[10:26:04 AM] MOVE 07-10-2025, Michelangelo,VI9189 → 07-10-2025, Fabio
+[9/25/2025, 10:28:22 AM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 10:28:24 AM] Sessione avviata su http://localhost:8000/
+[10:28:37 AM] MOVE 14-10-2025, Gabriele,TS1 → 14-10-2025, Fabrizio
+[10:28:47 AM] SET 14-10-2025, Gabriele,PAR
+[10:29:08 AM] MOVE 06-10-2025, Michelangelo,MP9235 → 15-10-2025, Alfredo
+[10:29:14 AM] MOVE 15-10-2025, Alfredo,MP9235 → 16-10-2025, Raffaele
+[10:29:50 AM] MOVE 20-10-2025, Fabio,CH3556 → 20-10-2025, Michelangelo
+[10:29:55 AM] SET 20-10-2025, Fabio,UM9243
+[10:29:55 AM] MOVE 21-10-2025, Fabio,CH6903 → 21-10-2025, Michelangelo
+[10:30:00 AM] SET 21-10-2025, Fabio,UM9243
+[10:30:18 AM] SET 22-10-2025, Fabio,UM9243
+[10:30:44 AM] MOVE 23-10-2025, Gabriele,A.D.R. → 23-10-2025, Giuseppe
+[10:30:49 AM] SET 23-10-2025, Gabriele,Ferie
+[10:31:02 AM] DELETE 24-10-2025, Raffaele,UM9243
+[10:31:02 AM] Celle cancellate.
+[9/25/2025, 10:32:00 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 10:32:34 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 10:35:29 AM] Sessione avviata su http://localhost:8000/
+[10:36:43 AM] MOVE 23-10-2025, Giuseppe,A.D.R. → 23-10-2025, Fabio
+[10:38:45 AM] SET 21-10-2025, Gabriele,A.D.R. RAD
+[10:41:11 AM] MOVE 10-11-2025, Michelangelo,TS1 → 10-11-2025, Fabio
+[10:41:12 AM] MOVE 11-11-2025, Michelangelo,TS1 → 11-11-2025, Fabio
+[10:41:13 AM] MOVE 12-11-2025, Michelangelo,TS1 → 12-11-2025, Fabio
+[10:41:14 AM] MOVE 13-11-2025, Michelangelo,TS1 → 13-11-2025, Fabio
+[10:41:15 AM] MOVE 14-11-2025, Michelangelo,TS1 → 14-11-2025, Fabio
+[10:41:20 AM] SET 10-11-2025, Michelangelo,Training
+[10:41:26 AM] SET 11-11-2025, Michelangelo,Training
+[10:41:26 AM] SET 12-11-2025, Michelangelo,Training
+[10:41:26 AM] SET 13-11-2025, Michelangelo,Training
+[10:41:26 AM] SET 14-11-2025, Michelangelo,Training
+[10:42:05 AM] SET 09-12-2025, Michelangelo,Training
+[10:42:19 AM] SET 10-12-2025, Michelangelo,Training
+[10:42:19 AM] SET 11-12-2025, Michelangelo,Training
+[10:42:19 AM] SET 12-12-2025, Michelangelo,Training
+[10:42:27 AM] SET 08-12-2025, Michelangelo,Training
+[10:42:47 AM] SET 01-12-2025, Michelangelo,Training
+[10:42:47 AM] SET 05-12-2025, Michelangelo,Training
+[10:42:47 AM] SET 02-12-2025, Michelangelo,Training
+[10:42:47 AM] SET 03-12-2025, Michelangelo,Training
+[10:42:47 AM] SET 04-12-2025, Michelangelo,Training
+[9/25/2025, 10:51:05 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 10:53:30 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 10:53:34 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 10:53:40 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 10:53:46 AM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 10:53:48 AM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 10:59:11 AM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 10:59:12 AM] Sessione avviata su http://localhost:8000/
+[10:59:19 AM] SET 26-09-2025, Fabrizio,cc
+[10:59:23 AM] DELETE 26-09-2025, Fabrizio,cc
+[10:59:23 AM] Celle cancellate.
+[11:05:43 AM] SET 29-10-2025, Giuseppe,LU7608
+[11:05:49 AM] SET 30-10-2025, Giuseppe,LU3002
+[9/25/2025, 11:05:51 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 11:05:51 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 11:08:11 AM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 11:08:12 AM] Sessione avviata su http://localhost:8000/
+[11:08:25 AM] UPDATE 30-10-2025, Giuseppe,LU3002 -> LU
+[11:08:25 AM] UPDATE 30-10-2025, Giuseppe,LU -> LU7608
+[9/25/2025, 11:08:31 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/25/2025, 11:08:47 AM] Sessione avviata su http://127.0.0.1:8000/
+[11:09:01 AM] SET 28-10-2025, Giuseppe,lk
+[11:09:03 AM] DELETE 28-10-2025, Giuseppe,lk
+[11:09:03 AM] Celle cancellate.
+[11:23:04 AM] MOVE 29-10-2025, Giuseppe,LU7608 → 31-10-2025, Giuseppe
+[11:24:47 AM] SET 26-09-2025, Lorenzo,T
+[11:24:47 AM] UPDATE 26-09-2025, Lorenzo,T -> TS2
+[11:58:21 AM] MOVE 30-09-2025, Fabrizio,OS7119 → 30-09-2025, Lorenzo
+[11:58:23 AM] MOVE 01-10-2025, Fabrizio,CAR6391 → 01-10-2025, Lorenzo
+[11:58:30 AM] SET 29-09-2025, Fabrizio,Ferie
+[11:58:36 AM] SET 30-09-2025, Fabrizio,Ferie
+[12:01:42 PM] MOVE 22-09-2025, Lorenzo,PT7249 → 24-09-2025, Fabrizio
+[12:01:45 PM] SWAP 24-09-2025, Lorenzo,GR4044 ⇄ 24-09-2025, Fabrizio,PT7249
+[12:01:56 PM] SET 22-09-2025, Lorenzo,TS2
+[12:09:11 PM] MOVE 29-09-2025, Lorenzo,SP6706 → 07-10-2025, Lorenzo
+[12:09:26 PM] MOVE 01-10-2025, Giuseppe,INI4623 → 29-09-2025, Giuseppe
+[1:09:26 PM] MOVE 03-10-2025, Giuseppe,Gun MV → 03-10-2025, Fabrizio
+[1:09:28 PM] MOVE 30-09-2025, Giuseppe,INI4623 → 02-10-2025, Giuseppe
+[1:09:30 PM] MOVE 29-09-2025, Giuseppe,INI4623 → 03-10-2025, Giuseppe
+[3:29:44 PM] MOVE 06-10-2025, Lorenzo,Gun MV → 14-10-2025, Giuseppe
+[3:29:53 PM] MOVE 06-10-2025, Fabrizio,MV2682 → 09-10-2025, Giuseppe
+[3:29:56 PM] MOVE 09-10-2025, Giuseppe,MV2682 → 13-10-2025, Lorenzo
+[3:29:58 PM] MOVE 14-10-2025, Giuseppe,Gun MV → 13-10-2025, Giuseppe
+[3:29:59 PM] MOVE 13-10-2025, Lorenzo,MV2682 → 14-10-2025, Giuseppe
+[3:30:03 PM] DELETE 03-10-2025, Fabrizio,Gun MV
+[3:30:03 PM] Celle cancellate.
+[3:30:50 PM] MOVE 13-10-2025, Giuseppe,Gun MV → 13-10-2025, Lorenzo
+[3:30:51 PM] MOVE 13-10-2025, Fabrizio,CAR7111 → 13-10-2025, Giuseppe
+[3:31:00 PM] MOVE 14-10-2025, Giuseppe,MV2682 → 14-10-2025, Lorenzo
+[3:31:03 PM] MOVE 14-10-2025, Lorenzo,MV2682 → 14-10-2025, Giuseppe
+[9/25/2025, 3:39:13 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 3:39:45 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 3:39:47 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 3:40:17 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 3:40:18 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 3:41:05 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 3:41:07 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 3:41:31 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 3:41:32 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 3:43:01 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 3:43:03 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 3:46:15 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 3:46:17 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 3:46:42 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 3:46:44 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 3:47:29 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 3:47:31 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 3:48:42 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 3:48:43 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 3:54:05 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 3:54:07 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 4:01:04 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 4:01:05 PM] Sessione avviata su http://localhost:8000/
+[4:08:13 PM] SET 16-10-2025, Giuseppe,M
+[4:08:13 PM] UPDATE 16-10-2025, Giuseppe,M -> Meeting
+[4:08:21 PM] SET 16-10-2025, Lorenzo,Meeting
+[4:08:21 PM] SET 16-10-2025, Fabrizio,Meeting
+[4:08:21 PM] UPDATE 16-10-2025, Gabriele,TS1 -> Meeting
+[4:08:21 PM] SET 16-10-2025, Michelangelo,Meeting
+[4:08:21 PM] SET 16-10-2025, Fabio,Meeting
+[4:08:21 PM] SET 16-10-2025, Alfredo,Meeting
+[9/25/2025, 4:10:26 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 4:10:28 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 4:17:02 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 4:17:04 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 4:19:28 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 4:19:30 PM] Sessione avviata su http://localhost:8000/
+[4:19:55 PM] UPDATE 15-10-2025, Fabio,A.D.R. RAD -> A.D.R. RAD bbb
+[4:20:04 PM] UPDATE 15-10-2025, Fabio,A.D.R. RAD bbb -> A.D.R. RAD
+[4:20:30 PM] UPDATE 15-10-2025, Fabio,A.D.R. RAD -> A.D.R. RAD vvv
+[4:20:38 PM] UPDATE 15-10-2025, Fabio,A.D.R. RAD vvv -> A.D.R. RAD
+[9/25/2025, 4:36:55 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 4:36:56 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 4:40:24 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 4:40:25 PM] Sessione avviata su http://localhost:8000/
+[4:40:40 PM] UPDATE 15-10-2025, Fabio,A.D.R. RAD -> A.D.R. RAD prova
+[4:40:52 PM] UPDATE 15-10-2025, Fabio,A.D.R. RAD prova -> A.D.R. RAD
+[9/25/2025, 6:12:21 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 6:12:22 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 6:13:26 PM] Sessione avviata su http://localhost:8000/
+[9/25/2025, 6:13:28 PM] Sessione avviata su http://localhost:8000/
+[9/26/2025, 8:48:00 AM] Sessione avviata su http://localhost:8000/
+[9/26/2025, 8:48:00 AM] Sessione avviata su http://localhost:8000/
+[9:06:17 AM] SET 29-09-2025, Giuseppe,L
+[9:06:17 AM] UPDATE 29-09-2025, Giuseppe,L -> LU7608
+[9:12:07 AM] SET 29-09-2025, Lorenzo,T
+[9:12:08 AM] UPDATE 29-09-2025, Lorenzo,T -> TS2
+[9:12:13 AM] SET 01-10-2025, Gabriele,T
+[9:12:13 AM] UPDATE 01-10-2025, Gabriele,T -> TS2
+[9:12:24 AM] SET 02-10-2025, Fabrizio,T
+[9:12:28 AM] SET 03-10-2025, Fabrizio,T
+[9:12:28 AM] UPDATE 03-10-2025, Fabrizio,T -> TS2
+[9:12:32 AM] SET 02-10-2025, Lorenzo,T
+[9:12:32 AM] UPDATE 02-10-2025, Lorenzo,T -> TS2
+[9:12:35 AM] DELETE 02-10-2025, Fabrizio,T
+[9:12:35 AM] Celle cancellate.
+[9:12:42 AM] SET 30-09-2025, Michelangelo,T
+[9:12:42 AM] UPDATE 30-09-2025, Michelangelo,T -> TS2
+[9:23:14 AM] SET 07-11-2025, Giuseppe,CCP
+[9:23:21 AM] UPDATE 07-11-2025, Giuseppe,CCP -> CCP Cri
+[9:46:15 AM] MOVE 03-10-2025, Fabrizio,TS2 → 03-10-2025, Gabriele
+[9:46:27 AM] MOVE 01-10-2025, Gabriele,TS2 → 01-10-2025, Fabrizio
+[9:46:32 AM] SET 01-10-2025, Gabriele,T
+[9:46:32 AM] UPDATE 01-10-2025, Gabriele,T -> TN1061
+[12:16:00 PM] SET 29-09-2025, Giuseppe,l
+[12:16:00 PM] UPDATE 29-09-2025, Giuseppe,l -> LA6007
+[12:16:05 PM] UPDATE 29-09-2025, Giuseppe,LA6007 -> lu
+[12:16:05 PM] UPDATE 29-09-2025, Giuseppe,lu -> LU7608
+[12:16:10 PM] MOVE 30-09-2025, Lorenzo,OS7119 → 30-09-2025, Giuseppe
+[9/26/2025, 12:16:23 PM] Sessione avviata su http://localhost:8000/
+[9/26/2025, 12:16:25 PM] Sessione avviata su http://localhost:8000/
+[2:02:53 PM] SET 01-10-2025, Gabriele,t
+[2:02:53 PM] UPDATE 01-10-2025, Gabriele,t -> TN1061
+[2:03:27 PM] SET 30-09-2025, Michelangelo,T
+[2:03:27 PM] UPDATE 30-09-2025, Michelangelo,T -> TS2
+[2:03:30 PM] SET 29-09-2025, Lorenzo,T
+[2:03:30 PM] UPDATE 29-09-2025, Lorenzo,T -> TS2
+[2:03:33 PM] SET 30-09-2025, Lorenzo,T
+[2:03:33 PM] UPDATE 30-09-2025, Lorenzo,T -> TS2
+[2:03:36 PM] SET 03-10-2025, Gabriele,T
+[2:03:36 PM] UPDATE 03-10-2025, Gabriele,T -> TS2
+[2:03:42 PM] SET 02-10-2025, Fabrizio,T
+[2:03:42 PM] UPDATE 02-10-2025, Fabrizio,T -> TS2
+[2:03:44 PM] MOVE 01-10-2025, Lorenzo,CAR6391 → 01-10-2025, Fabrizio
+[2:03:48 PM] MOVE 30-09-2025, Lorenzo,TS2 → 01-10-2025, Lorenzo
+[9/26/2025, 6:21:56 PM] Sessione avviata su http://127.0.0.1:8000/
+[9/26/2025, 6:22:34 PM] Sessione avviata su http://127.0.0.1:8000/
+[9/26/2025, 6:22:44 PM] Sessione avviata su http://127.0.0.1:8000/
+[9/26/2025, 6:40:50 PM] Sessione avviata su http://127.0.0.1:8000/
+[9/26/2025, 6:40:52 PM] Sessione avviata su http://127.0.0.1:8000/
+[9/26/2025, 6:40:53 PM] Sessione avviata su http://127.0.0.1:8000/
+[9/26/2025, 6:40:54 PM] Sessione avviata su http://127.0.0.1:8000/
+[9/26/2025, 6:42:32 PM] Sessione avviata su http://127.0.0.1:8000/
+[9/26/2025, 6:42:33 PM] Sessione avviata su http://127.0.0.1:8000/
+[9/26/2025, 6:42:34 PM] Sessione avviata su http://127.0.0.1:8000/
+[9/26/2025, 6:42:34 PM] Sessione avviata su http://127.0.0.1:8000/
+[9/26/2025, 6:42:48 PM] Sessione avviata su http://127.0.0.1:8000/
+[9/26/2025, 6:45:22 PM] Sessione avviata su http://127.0.0.1:8000/
+[9/27/2025, 9:10:10 AM] Sessione avviata su http://localhost:8000/
+[9/27/2025, 9:10:11 AM] Sessione avviata su http://localhost:8000/
+[9/29/2025, 8:18:10 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/29/2025, 8:36:51 AM] Sessione avviata su http://127.0.0.1:8000/
+[9/30/2025, 9:45:45 AM] Sessione avviata su http://localhost:8000/
+[9:56:28 AM] SET 07-11-2025, Giuseppe,CRI Seq
+[9:57:06 AM] MOVE 23-10-2025, Lorenzo,PG6749 → 27-10-2025, Gabriele
+[9/30/2025, 10:05:58 AM] Sessione avviata su http://127.0.0.1:8000/
+[10:06:34 AM] DELETE 30-09-2025, Fabrizio,Ferie
+[10:06:34 AM] Celle cancellate.
+[10:06:41 AM] MOVE 01-10-2025, Fabrizio,CAR6391 → 01-10-2025, Giuseppe
+[10:06:49 AM] MOVE 02-10-2025, Fabrizio,TS2 → 02-10-2025, Lorenzo
+[9/30/2025, 11:48:02 AM] Sessione avviata su http://localhost:8000/
+[9/30/2025, 11:48:03 AM] Sessione avviata su http://localhost:8000/
+[2:53:47 PM] DELETE 15-10-2025, Giuseppe,OS7119
+[2:53:47 PM] Celle cancellate.
+[2:54:03 PM] SET 28-11-2025, Giuseppe,OS7119
+[4:52:56 PM] SET 27-10-2025, Giuseppe,Gun Versa1
+[4:53:04 PM] UPDATE 27-10-2025, Giuseppe,Gun Versa1 -> Gun Versa1 OSMA
+[4:53:14 PM] SET 28-10-2025, Giuseppe,Gun Versa1 OSMA
+[10/1/2025, 10:10:46 AM] Sessione avviata su http://localhost:8000/
+[10/1/2025, 10:10:47 AM] Sessione avviata su http://localhost:8000/
+[10:44:54 AM] MOVE 14-10-2025, Giuseppe,MV2682 → 14-10-2025, Lorenzo
+[10:45:02 AM] SET 14-10-2025, Giuseppe,Cena Eli
+[10:53:38 AM] MOVE 27-10-2025, Giuseppe,Gun Versa1 OSMA → 27-10-2025, Lorenzo
+[10:53:46 AM] SET 27-10-2025, Giuseppe,Grosseto
+[10:53:53 AM] UPDATE 27-10-2025, Giuseppe,Grosseto -> Grosseto VeriQA
+[11:52:14 AM] SET 09-10-2025, Giuseppe,Careggi 9.30
+[1:44:43 PM] DELETE 02-10-2025, Lorenzo,TS2
+[1:44:43 PM] Celle cancellate.
+[1:44:50 PM] SET 02-10-2025, Lorenzo,PG
+[1:44:50 PM] UPDATE 02-10-2025, Lorenzo,PG -> PG6749
+[1:45:01 PM] SET 30-09-2025, Fabrizio,Ferie
+[1:45:01 PM] SET 01-10-2025, Fabrizio,Ferie
+[1:45:01 PM] SET 02-10-2025, Fabrizio,Ferie
+[1:45:01 PM] SET 03-10-2025, Fabrizio,Ferie
+[1:45:13 PM] SET 06-10-2025, Fabrizio,Ferie
+[1:45:13 PM] SET 07-10-2025, Fabrizio,Ferie
+[1:45:13 PM] SET 08-10-2025, Fabrizio,Ferie
+[1:45:13 PM] SET 09-10-2025, Fabrizio,Ferie
+[1:45:13 PM] SET 10-10-2025, Fabrizio,Ferie
+[10/2/2025, 12:31:55 PM] Sessione avviata su http://127.0.0.1:8000/
+[12:40:22 PM] SET 07-10-2025, Giuseppe,SP6706
+[12:54:41 PM] SET 12-12-2025, Giuseppe,Cena
+[12:54:58 PM] SET 12-12-2025, Fabrizio,Cena
+[12:54:58 PM] SET 12-12-2025, Gabriele,Cena
+[12:54:58 PM] SET 12-12-2025, Christian,Cena
+[12:54:58 PM] SET 12-12-2025, Alfredo,Cena
+[12:54:58 PM] SET 12-12-2025, Raffaele,Cena
+[12:54:58 PM] SET 12-12-2025, Lorenzo,Cena
+[12:55:49 PM] SET 15-10-2025, Giuseppe,FRIZZI
+[10/3/2025, 2:09:11 PM] Sessione avviata su http://localhost:8000/
+[8:19:14 PM] DELETE 07-10-2025, Giuseppe,SP6706
+[8:19:14 PM] Celle cancellate.
+[8:20:04 PM] SET 06-10-2025, Michelangelo,PTV
+[10/3/2025, 8:21:12 PM] Sessione avviata su http://localhost:8000/
+[10/3/2025, 8:21:13 PM] Sessione avviata su http://localhost:8000/
+[8:21:27 PM] SET 06-10-2025, Alfredo,Assente
+[8:21:27 PM] SET 07-10-2025, Alfredo,Assente
+[8:21:27 PM] SET 08-10-2025, Alfredo,Assente
+[8:21:27 PM] SET 09-10-2025, Alfredo,Assente
+[8:21:27 PM] SET 10-10-2025, Alfredo,Assente
+[8:23:48 PM] MOVE 08-10-2025, Raffaele,PTV9174 → 08-10-2025, Alfredo,(overwrite Assente)
+[8:23:50 PM] MOVE 08-10-2025, Alfredo,PTV9174 → 08-10-2025, Raffaele
+[8:23:53 PM] DELETE 08-10-2025, Raffaele,PTV9174
+[8:23:53 PM] Celle cancellate.
+[8:24:01 PM] SET 08-10-2025, Alfredo,Assente
+[8:24:04 PM] UPDATE 06-10-2025, Michelangelo,PTV -> PTV9174
+[8:27:31 PM] UPDATE 06-10-2025, Raffaele,A.D.R. -> A.D.R. + MP
+[8:29:58 PM] SET 07-10-2025, Raffaele,T
+[8:30:05 PM] DELETE 07-10-2025, Raffaele,T
+[8:32:00 PM] UPDATE 06-10-2025, Raffaele,A.D.R. + MP -> A.D.R.
+[8:32:35 PM] SET 06-10-2025, Lorenzo,T
+[8:32:35 PM] UPDATE 06-10-2025, Lorenzo,T -> TS2
+[8:32:41 PM] SET 07-10-2025, Michelangelo,T
+[8:32:41 PM] UPDATE 07-10-2025, Michelangelo,T -> TS2
+[8:32:46 PM] SET 08-10-2025, Fabio,V
+[8:32:46 PM] UPDATE 08-10-2025, Fabio,V -> VI9189
+[8:32:55 PM] MOVE 08-10-2025, Lorenzo,LU3002 → 08-10-2025, Giuseppe
+[8:32:58 PM] SET 08-10-2025, Lorenzo,T
+[8:32:58 PM] UPDATE 08-10-2025, Lorenzo,T -> TS2
+[8:33:06 PM] SET 09-10-2025, Michelangelo,T
+[8:33:09 PM] UPDATE 09-10-2025, Michelangelo,T -> TS2
+[8:33:13 PM] SET 09-10-2025, Fabio,F
+[8:33:13 PM] UPDATE 09-10-2025, Fabio,F -> Ferie
+[8:33:17 PM] SET 10-10-2025, Fabio,F
+[8:33:17 PM] UPDATE 10-10-2025, Fabio,F -> Ferie
+[10/6/2025, 9:49:47 AM] Sessione avviata su http://localhost:8000/
+[10/6/2025, 9:49:48 AM] Sessione avviata su http://localhost:8000/
+[10:34:09 AM] SET 04-11-2025, Giuseppe,Riunione di Area
+[10:34:18 AM] SET 04-11-2025, Lorenzo,Riunione di Area
+[10:34:18 AM] SET 04-11-2025, Fabrizio,Riunione di Area
+[10:34:18 AM] SET 04-11-2025, Gabriele,Riunione di Area
+[10:34:18 AM] SET 04-11-2025, Michelangelo,Riunione di Area
+[10:34:18 AM] SET 04-11-2025, Fabio,Riunione di Area
+[10:34:18 AM] SET 04-11-2025, Alfredo,Riunione di Area
+[10:34:18 AM] SET 04-11-2025, Raffaele,Riunione di Area
+[10:34:35 AM] DELETE 16-10-2025, Giuseppe,Meeting
+[10:34:35 AM] Celle cancellate.
+[10:34:48 AM] DELETE 16-10-2025, Lorenzo,Meeting
+[10:34:48 AM] Celle cancellate.
+[10:34:51 AM] DELETE 16-10-2025, Fabrizio,Meeting
+[10:34:51 AM] Celle cancellate.
+[10:34:53 AM] DELETE 16-10-2025, Gabriele,Meeting
+[10:34:53 AM] Celle cancellate.
+[10:34:56 AM] DELETE 16-10-2025, Michelangelo,Meeting
+[10:34:56 AM] Celle cancellate.
+[10:34:59 AM] DELETE 16-10-2025, Fabio,Meeting
+[10:34:59 AM] Celle cancellate.
+[10:35:01 AM] DELETE 16-10-2025, Alfredo,Meeting
+[10:35:01 AM] Celle cancellate.
+[10:35:06 AM] SET 16-10-2025, Gabriele,T
+[10:35:06 AM] UPDATE 16-10-2025, Gabriele,T -> TS1
+[10:35:24 AM] SET 13-10-2025, Alfredo,Assente
+[10:35:24 AM] SET 14-10-2025, Alfredo,Assente
+[10:35:24 AM] SET 15-10-2025, Alfredo,Assente
+[10:35:24 AM] SET 16-10-2025, Alfredo,Assente
+[10:35:24 AM] SET 17-10-2025, Alfredo,Assente
+[10:35:30 AM] SET 20-10-2025, Alfredo,Assente
+[10:35:30 AM] SET 21-10-2025, Alfredo,Assente
+[10:35:30 AM] SET 22-10-2025, Alfredo,Assente
+[10:35:30 AM] SET 23-10-2025, Alfredo,Assente
+[10:35:30 AM] SET 24-10-2025, Alfredo,Assente
+[10:35:36 AM] SET 27-10-2025, Alfredo,Assente
+[10:35:36 AM] SET 28-10-2025, Alfredo,Assente
+[10:35:36 AM] SET 29-10-2025, Alfredo,Assente
+[10:35:36 AM] SET 30-10-2025, Alfredo,Assente
+[2:54:44 PM] SET 13-10-2025, Fabrizio,Ferie
+[2:54:45 PM] SET 15-10-2025, Fabrizio,Ferie
+[2:54:46 PM] SET 16-10-2025, Fabrizio,Ferie
+[2:54:46 PM] UPDATE 17-10-2025, Fabrizio,AR7289 -> Ferie
+[2:55:12 PM] SET 17-10-2025, Lorenzo,a
+[2:55:12 PM] UPDATE 17-10-2025, Lorenzo,a -> AR7289
+[3:01:53 PM] UPDATE 14-10-2025, Giuseppe,Cena Eli -> Cena Eli + Siena
+[10/6/2025, 6:27:15 PM] Sessione avviata su http://127.0.0.1:8000/
+[7:00:47 PM] SET 15-10-2025, Raffaele,P
+[7:00:47 PM] UPDATE 15-10-2025, Raffaele,P -> PIO3412
+[10/6/2025, 7:12:18 PM] Sessione avviata su http://127.0.0.1:8000/
+[10/7/2025, 8:54:13 AM] Sessione avviata su http://localhost:8000/
+[10/7/2025, 3:46:15 PM] Sessione avviata su http://localhost:8000/
+[10/7/2025, 4:25:55 PM] Sessione avviata su http://localhost:8000/
+[10/7/2025, 4:25:56 PM] Sessione avviata su http://localhost:8000/
+[10/8/2025, 10:20:40 AM] Sessione avviata su http://localhost:8000/
+[10/8/2025, 10:20:42 AM] Sessione avviata su http://localhost:8000/
+[10:20:54 AM] SET 13-10-2025, Fabio,Ferie
+[10:20:56 AM] SET 14-10-2025, Fabio,F
+[10:20:57 AM] UPDATE 14-10-2025, Fabio,F -> Ferie
+[10/9/2025, 1:58:22 PM] Sessione avviata su http://127.0.0.1:8000/
+[1:58:41 PM] UPDATE 13-10-2025, Giuseppe,CAR7111 -> CAR
+[1:58:41 PM] UPDATE 13-10-2025, Giuseppe,CAR -> CAR6224
+[1:58:55 PM] UPDATE 29-10-2025, Fabrizio,CAR6224 -> car711
+[1:58:55 PM] UPDATE 29-10-2025, Fabrizio,car711 -> CAR7111
+[10/10/2025, 9:03:59 AM] Sessione avviata su http://localhost:8000/
+[10/10/2025, 9:04:01 AM] Sessione avviata su http://localhost:8000/
+[10/10/2025, 5:30:22 PM] Sessione avviata su http://127.0.0.1:8000/
+[5:30:51 PM] SET 13-10-2025, Michelangelo,so
+[5:30:51 PM] UPDATE 13-10-2025, Michelangelo,so -> SO7103
+[5:30:56 PM] UPDATE 13-10-2025, Gabriele,TS1 -> G
+[5:30:56 PM] UPDATE 13-10-2025, Gabriele,G -> GR4044
+[10/10/2025, 6:33:28 PM] Sessione avviata su http://localhost:8000/
+[10/10/2025, 6:33:30 PM] Sessione avviata su http://localhost:8000/
+[10/12/2025, 1:24:59 PM] Sessione avviata su http://localhost:8000/
+[1:25:24 PM] MOVE 17-10-2025, Fabrizio,Ferie → 20-10-2025, Fabrizio
+[10/12/2025, 10:36:04 PM] Sessione avviata su http://localhost:8000/
+[10/13/2025, 10:28:20 AM] Sessione avviata su http://127.0.0.1:8000/
