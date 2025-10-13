@@ -66,10 +66,10 @@ except Exception:
 def get_user(username: str):
     return USERS.get(username or "")
 
-def login_user(username: str):
+def login_user(username, role=None):
     session.clear()
-    session["user"] = username
-    session["role"] = (USERS.get(username) or {}).get("role")
+    session['user'] = username
+    session['role'] = role if role is not None else USERS.get(username, {}).get('role')
 
 def logout_user():
     session.clear()
@@ -96,53 +96,38 @@ def requires_role(min_role="read"):
 
 @app.post("/login")
 def login_post():
-    """
-    Login semplificato: accetta solo { "password": "..." } (application/json)
-    Verifica contro ADMIN_PW_HASH o ADMIN_PW (ENV).
-    Se OK: imposta sessione user=admin role=write
-    """
-    try:
-        # leggi password (json preferito, ma supporto anche form)
-        ctype = (request.headers.get("Content-Type") or "").split(";")[0].strip().lower()
-        if ctype == "application/json":
-            data = request.get_json(force=True, silent=True) or {}
-            password = data.get("password", "")
-        else:
-            # supporta anche form post
-            password = request.form.get("password", "")
+    import os
+    from werkzeug.security import check_password_hash
 
-        password = (password or "").strip()
-        if not password:
-            return jsonify(ok=False, error="missing password"), 400
+    data = request.get_json(silent=True) or {}
+    password = data.get("password", "")
 
-        # leggi ENV
-        admin_hash = os.environ.get("ADMIN_PW_HASH", "").strip()
-        admin_pw_plain = os.environ.get("ADMIN_PW", "").strip()
+    # Recupera la password o hash dalle variabili d'ambiente
+    pw_plain = os.environ.get("ADMIN_PW")
+    pw_hash = os.environ.get("ADMIN_PW_HASH")
 
-        # verifica: se c'è hash usalo; altrimenti se c'è pw in chiaro confronta
-        ok = False
-        if admin_hash:
-            # admin_hash expected pbkdf2... oppure altro; use werkzeug check
-            try:
-                ok = check_password_hash(admin_hash, password)
-            except Exception:
-                ok = (admin_hash == password)  # fallback paranoico (non probabile)
-        elif admin_pw_plain:
-            ok = (admin_pw_plain == password)
-        else:
-            return jsonify(ok=False, error="admin password not configured"), 500
+    # Se non è configurata nessuna password, errore
+    if not pw_plain and not pw_hash:
+        app.logger.error("ADMIN_PW or ADMIN_PW_HASH not configured")
+        return jsonify(ok=False, error="admin password not configured"), 500
 
-        if not ok:
-            return jsonify(ok=False, error="invalid password"), 401
+    # Verifica la password
+    ok = False
+    if pw_plain and password == pw_plain:
+        ok = True
+    elif pw_hash and check_password_hash(pw_hash, password):
+        ok = True
 
-        # login as admin
-        login_user("admin")
-        session.permanent = True
-        return jsonify(ok=True, user="admin", role="write"), 200
+    if not ok:
+        return jsonify(ok=False, error="invalid password"), 401
 
-    except Exception as e:
-        log.error(f"[login] {e}\n{traceback.format_exc()}")
-        return jsonify(ok=False, error=str(e)), 500
+    # ✅ Login riuscito
+    login_user("admin")
+    session["role"] = "write"    # forza ruolo admin
+    session.permanent = True
+
+    return jsonify(ok=True, user="admin", role="write"), 200
+
 
 @app.post("/logout")
 def logout_post():
