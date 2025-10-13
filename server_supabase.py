@@ -175,36 +175,39 @@ def api_read_text_legacy(name: str):
 
 
 @app.put("/api/files/<path:name>")
+@app.put("/api/files/<path:name>")
 def api_write_text_legacy(name: str):
     try:
         fname = _sanitize(name)
         raw = request.get_data(as_text=True) or ""
         _upload_text(fname, raw)
 
-sha_in = sha256(raw.encode("utf-8")).hexdigest()
-echoed = _download_text(fname)
-sha_echo = sha256((echoed or "").encode("utf-8")).hexdigest()
+        sha_in = sha256(raw.encode("utf-8")).hexdigest()
+        echoed = _download_text(fname)
+        sha_echo = sha256((echoed or "").encode("utf-8")).hexdigest()
 
-attempts = 0
-while sha_echo != sha_in and attempts < 5:
-    time.sleep(0.16)
-    echoed = _download_text(fname)
-    sha_echo = sha256((echoed or "").encode("utf-8")).hexdigest()
-    attempts += 1
+        attempts = 0
+        while sha_echo != sha_in and attempts < 5:
+            time.sleep(0.16)
+            echoed = _download_text(fname)
+            sha_echo = sha256((echoed or "").encode("utf-8")).hexdigest()
+            attempts += 1
 
-payload = {
-    "ok": True,
-    "path": fname,
-    "size": len(raw),
-    "sha_in": sha_in,
-    "sha_echo": sha_echo,
-    "matched": sha_echo == sha_in,
-}
+        payload = {
+            "ok": True,
+            "path": fname,
+            "size": len(raw),
+            "sha_in": sha_in,
+            "sha_echo": sha_echo,
+            "matched": sha_echo == sha_in,
+        }
+
         # no-cache anche qui
         resp = make_response(jsonify(payload), 200)
         for k, v in _nocache_headers({"ETag": f'W/"{payload["sha_echo"]}"'}).items():
             resp.headers[k] = v
         return resp
+
     except Exception as e:
         log.error(f"[PUT legacy] '{name}': {e}\n{traceback.format_exc()}")
         return jsonify(ok=False, error=str(e)), 500
