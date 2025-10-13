@@ -29,7 +29,7 @@ WRITE_CACHE_TTL = 120.0  # secondi
 _WRITE_CACHE: dict[str, dict] = {}
 _LAST_CACHE_HIT = False
 
-app = Flask(__name__, static_folder=PUBLIC_DIR, static_url_path="/static")
+app = Flask(__name__, static_folder="public", static_url_path="")
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 logging.basicConfig(level=logging.INFO)
