@@ -565,3 +565,5 @@
 [10:59:55 PM] Celle cancellate.
 [10/13/2025, 11:02:13 PM] Sessione avviata su https://plannyweb.onrender.com/
 [11:02:24 PM] SET 16-10-2025, Giuseppe,ciao
+[11:02:34 PM] DELETE 16-10-2025, Giuseppe,ciao
+[11:02:34 PM] Celle cancellate.
