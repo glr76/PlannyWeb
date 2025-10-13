@@ -563,4 +563,4 @@
 [10/13/2025, 4:11:43 PM] Sessione avviata su https://plannyweb.onrender.com/
 [10:59:55 PM] DELETE 16-10-2025, Lorenzo,h
 [10:59:55 PM] Celle cancellate.
-[10/13/2025, 11:02:12 PM] Sessione avviata su https://plannyweb.onrender.com/
+[10/13/2025, 11:02:13 PM] Sessione avviata su https://plannyweb.onrender.com/
