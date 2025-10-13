@@ -129,7 +129,6 @@ td, th {padding: 2px 4px;}
 </head>
 <body>
 <div class="wrap">
-  <h1>Planny (HTML)</h1>
   
 <div id="auth-bar" style="display:flex;gap:.5rem;align-items:center;justify-content:flex-end;padding:.5rem 1rem;border-bottom:1px solid #eee;margin-bottom:8px">
   <span id="auth-status">👤 ospite</span>
@@ -1365,47 +1364,55 @@ function hideCtx(){
 
   /* ------- Autoload ------- */
   async function autoLoad(){
-    log('Autoload…','info');
-    if(location.protocol==='file:') log('Aperto via file:// – usa il server Flask per salvataggi automatici.','warn');
+  log('Autoload…','info');
+  if(location.protocol==='file:') log('Aperto via file:// – usa il server Flask per salvataggi automatici.','warn');
 
-    try{
-      const cfg=await getTextFromServer('config.ini');
-      if(cfg){
-        const ini=parseIni(cfg);
-        if(ini['Anno']?.['year']) $('#year').value=ini['Anno']['year'];
-        if(ini['Team']?.['names']) $('#names').value=ini['Team']['names'];
-        if(ini['Linac']?.['options']) $('#options').value=ini['Linac']['options'];
-      }
-      if(!$('#year').value){
-        const cfgTxt = await getTextFromServer('config.ini');
-        if(cfgTxt){
-          const y = parseYearFromConfigTxt(cfgTxt);
-          if(y){ $('#year').value = y; log('Anno letto da config.ini: '+y,'ok'); }
-        }
-      }
-      state.year=parseInt($('#year').value || (new Date().getFullYear()+1),10);
-      state.names=($('#names').value||'').split(',').map(s=>s.trim()).filter(Boolean);
-      state.options=($('#options').value||'').split(',').map(s=>s.trim()).filter(Boolean);
-      const dl=$('#options-list'); dl.innerHTML=''; state.options.forEach(v=>{ const o=document.createElement('option'); o.value=v.trim(); dl.appendChild(o); });
+  try{
+    const yearEl = $('#year');
+    const namesEl = $('#names');
+    const optsEl  = $('#options');
 
-      await loadHolidaysFromLocalOrWeb();
-
-      const selName = selectionsFileName();
-      const selTxt = await getTextFromServer(selName);
-      if(selTxt){ importSelectionsFromText(selTxt); log('Caricato '+selName,'ok'); }
-		else { log('Nessun selections trovato su server: '+selName,'warn'); }
-  
-      save.selName = selName;
-      save.logName = 'planny_log_'+state.year+'.txt';
-
-      try { await appendLogsToServer({force:true}); } catch(e){ log('Impossibile creare/aggiornare il log: '+e.message,'warn'); }
-
-      renderAndJumpToToday();
-
-    }catch(e){
-      log('Errore in autoload: '+e.message,'err');
+    // 1) leggi config.ini (se presente)
+    const cfgTxt = await getTextFromServer('config.ini').catch(()=> '');
+    let iniYear = null, iniNames = '', iniOpts = '';
+    if (cfgTxt){
+      const ini = parseIni(cfgTxt);
+      iniYear  = ini['Anno']?.['year'] ? parseInt(ini['Anno']['year'],10) : (parseYearFromConfigTxt(cfgTxt)||null);
+      iniNames = ini['Team']?.['names']    || '';
+      iniOpts  = ini['Linac']?.['options'] || '';
+      if (yearEl)  yearEl.value  = iniYear || '';
+      if (namesEl) namesEl.value = iniNames;
+      if (optsEl)  optsEl.value  = iniOpts;
     }
+
+    // 2) imposta lo stato (senza assumere esistenza degli input)
+    state.year    = iniYear ?? (yearEl?.value ? parseInt(yearEl.value,10) : (new Date().getFullYear()+1));
+    state.names   = (namesEl?.value || iniNames || '').split(',').map(s=>s.trim()).filter(Boolean);
+    state.options = (optsEl?.value  || iniOpts  || '').split(',').map(s=>s.trim()).filter(Boolean);
+
+    // 3) popola datalist opzioni
+    const dl = $('#options-list'); 
+    if (dl){ dl.innerHTML=''; state.options.forEach(v=>{ const o=document.createElement('option'); o.value=v.trim(); dl.appendChild(o); }); }
+
+    // 4) prosegui come prima
+    await loadHolidaysFromLocalOrWeb();
+
+    const selName = selectionsFileName();
+    const selTxt = await getTextFromServer(selName).catch(()=> '');
+    if(selTxt){ importSelectionsFromText(selTxt); log('Caricato '+selName,'ok'); }
+    else { log('Nessun selections trovato su server: '+selName,'warn'); }
+
+    save.selName = selName;
+    save.logName = 'planny_log_'+state.year+'.txt';
+
+    try { await appendLogsToServer({force:true}); } catch(e){ log('Impossibile creare/aggiornare il log: '+e.message,'warn'); }
+
+    renderAndJumpToToday();
+
+  }catch(e){
+    log('Errore in autoload: '+e.message,'err');
   }
+}
 
 
   document.getElementById('jump-today').addEventListener('click', jumpToToday);
