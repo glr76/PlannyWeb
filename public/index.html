@@ -1227,8 +1227,27 @@ document.addEventListener('keydown', (e)=>{
 
   /* ======== CONTEXT MENU ======== */
   const ctx = document.getElementById('ctx');
-  function showCtx(x,y){ ctx.style.left=x+'px'; ctx.style.top=y+'px'; ctx.style.display='block'; ctx.setAttribute('aria-hidden','false'); ctx.querySelector('.itm')?.focus(); }
-  function hideCtx(){ ctx.style.display='none'; ctx.setAttribute('aria-hidden','true'); state.ctxTarget=null; }
+  function showCtx(x,y){
+  ctx.style.left = x+'px';
+  ctx.style.top  = y+'px';
+  ctx.style.display = 'block';
+  ctx.setAttribute('aria-hidden','false');
+  ctx.querySelector('.itm')?.focus(); // ok
+}
+  function hideCtx(){
+  // se qualcosa dentro #ctx ha il focus, spostalo via
+  if (ctx.contains(document.activeElement)) {
+    try {
+      document.activeElement.blur();
+    } catch(_) {}
+    // rimetti il focus su qualcosa di “sicuro”
+    const fallback = state.anchorCell?.querySelector('input') || document.body;
+    try { fallback.focus(); } catch(_) {}
+  }
+  ctx.style.display = 'none';
+  ctx.setAttribute('aria-hidden','true');
+  state.ctxTarget = null;
+}
 
   document.addEventListener('contextmenu', (e)=>{
     const inInput = e.target.closest?.('.cell.editing input');
