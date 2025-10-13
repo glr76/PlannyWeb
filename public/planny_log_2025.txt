@@ -540,3 +540,4 @@
 [1:25:24 PM] MOVE 17-10-2025, Fabrizio,Ferie → 20-10-2025, Fabrizio
 [10/12/2025, 10:36:04 PM] Sessione avviata su http://localhost:8000/
 [10/13/2025, 10:28:20 AM] Sessione avviata su http://127.0.0.1:8000/
+[10/13/2025, 2:45:31 PM] Sessione avviata su https://plannyweb.onrender.com/
