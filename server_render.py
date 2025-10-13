@@ -278,7 +278,7 @@ def api_write_text_legacy(name: str):
 @app.get("/api/files/list")
 def api_list_files():
     try:
-        files = _gh_list(GITHUB_DIR_PREFIX.rstrip("/"))  # root del repo; usa "public" se vuoi solo quella cartella
+        files = _gh_list("public")  # root del repo; usa "public" se vuoi solo quella cartella
         return jsonify(ok=True, source="github", count=len(files), files=files)
     except Exception as e:
         log.error(f"[LIST] {e}\n{traceback.format_exc()}")
