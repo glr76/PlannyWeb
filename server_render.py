@@ -56,7 +56,7 @@ log = app.logger
 # ----------------------------------------------------
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "change-me")
 
-USERS_JSON = os.environ.get("USERS_JSON", "{}").strip()
+USERS_JSON = {}
 try:
     USERS = json.loads(USERS_JSON) if USERS_JSON else {}
 except Exception:
@@ -94,7 +94,6 @@ def requires_role(min_role="read"):
         return wrapper
     return decorator
 
-@app.post("/login")
 @app.post("/login")
 def login_post():
     """
