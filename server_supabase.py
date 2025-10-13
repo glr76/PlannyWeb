@@ -1,5 +1,6 @@
 # server_supabase.py
 import os
+import io
 import logging
 import traceback
 import time
@@ -34,7 +35,7 @@ log = app.logger
 
 
 # ----------------------------------------------------
-# Helpers
+# Helpers Storage
 # ----------------------------------------------------
 def _sanitize(name: str) -> str:
     """Evita percorsi strani e normalizza gli slash."""
@@ -49,7 +50,6 @@ def _sanitize(name: str) -> str:
 
 
 def _download_text(path: str) -> str:
-    """Legge il file dal bucket e ritorna testo UTF-8 (o stringa vuota se non trovato/errore)."""
     try:
         data = supabase.storage.from_(BUCKET).download(path)
         return data.decode("utf-8", "replace")
@@ -60,60 +60,22 @@ def _download_text(path: str) -> str:
 
 def _upload_text(path: str, content: str):
     """
-    Scrive il file su Supabase Storage con metadata anti-cache.
-    - Forza cache_control=0 (niente TTL sulla CDN)
-    - Prova sia snake_case che camelCase per compatibilità tra versioni dell'SDK
-    - Tenta update(); se non va, fallback su upload(upsert=True)
+    Scrive il file assicurando metadata anti-cache nel bucket.
+    Tenta update; se fallisce, fa upload (creazione).
     """
     data_bytes = content.encode("utf-8")
-
-    # Opzioni preferite (snake_case) per supabase-py recenti
-    opts_snake = {
-        "content_type": "text/plain; charset=utf-8",
-        "upsert": True,
-        "cache_control": "0",   # <-- TTL zero a livello CDN
-    }
-    # Fallback camelCase per SDK meno recenti
-    opts_camel = {
+    file_opts = {
         "contentType": "text/plain; charset=utf-8",
+        # molte versioni di supabase-py accettano 'upsert' e 'cacheControl' qui
         "upsert": True,
         "cacheControl": "0",
     }
 
-    store = supabase.storage.from_(BUCKET)
-
-    # 1) tenta UPDATE con opzioni snake_case
-    try:
-        store.update(path, data_bytes, opts_snake)  # type: ignore[arg-type]
-        return
-    except Exception as e_snake_upd:
-        log.info(f"[update snake] miss '{path}': {e_snake_upd}")
-
-    # 2) tenta UPDATE con opzioni camelCase
-    try:
-        store.update(path, data_bytes, opts_camel)  # type: ignore[arg-type]
-        return
-    except Exception as e_camel_upd:
-        log.info(f"[update camel] miss '{path}': {e_camel_upd}")
-
-    # 3) fallback: UPLOAD con snake_case
-    try:
-        store.upload(path, data_bytes, opts_snake)  # type: ignore[arg-type]
-        return
-    except Exception as e_snake_upl:
-        log.info(f"[upload snake] miss '{path}': {e_snake_upl}")
-
-    # 4) ultimo tentativo: UPLOAD con camelCase
-    try:
-        store.upload(path, data_bytes, opts_camel)  # type: ignore[arg-type]
-        return
-    except Exception as e_camel_upl:
-        log.error(f"[upload fail] '{path}': {e_camel_upl}\n{traceback.format_exc()}")
-        raise
+    # 1) Tenta UPDATE (se esiste già)
+    supabase.storage.from_(BUCKET).upload(path, data_bytes, file_opts) 
 
 
 def _nocache_headers(extra: dict | None = None) -> dict:
-    """Header per disabilitare cache a livello di risposta Flask / proxy a valle di Flask."""
     h = {
         "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate",
         "Pragma": "no-cache",
@@ -125,28 +87,6 @@ def _nocache_headers(extra: dict | None = None) -> dict:
     return h
 
 
-def _sha(txt: str) -> str:
-    return sha256((txt or "").encode("utf-8")).hexdigest()
-
-
-def _read_back_until_match(path: str, expected_sha: str, timeout_s: float = 1.6) -> tuple[str, str, bool]:
-    """
-    Dopo un upload, la CDN di Storage può servire per un attimo la vecchia versione.
-    Qui rileggiamo ripetutamente finché l'SHA non combacia o finché scade il timeout.
-    Ritorna: (echo_text, echo_sha, matched)
-    """
-    start = time.time()
-    delay = 0.05
-    echo = _download_text(path)
-    echo_sha = _sha(echo)
-    while echo_sha != expected_sha and (time.time() - start) < timeout_s:
-        time.sleep(delay)
-        delay = min(delay * 2, 0.4)  # backoff fino a 400ms
-        echo = _download_text(path)
-        echo_sha = _sha(echo)
-    return echo, echo_sha, (echo_sha == expected_sha)
-
-
 # ----------------------------------------------------
 # API FILES - JSON (raccomandato)
 # ----------------------------------------------------
@@ -156,7 +96,7 @@ def api_text_get(name: str):
         fname = _sanitize(name)
         txt = _download_text(fname)
         status = 200 if txt != "" else 404
-        etag = _sha(txt)
+        etag = sha256((txt or "").encode("utf-8")).hexdigest()
         headers = _nocache_headers({"ETag": f'W/"{etag}"'})
         resp = make_response(jsonify(ok=(status == 200), name=fname, text=txt), status)
         for k, v in headers.items():
@@ -173,14 +113,19 @@ def api_text_put(name: str):
         fname = _sanitize(name)
         raw = request.get_data(as_text=True) or ""
 
-        # 1) scrivi
         _upload_text(fname, raw)
 
-        # 2) rileggi con retry fino a match (gestisce eventuale staleness CDN)
-        sha_in = _sha(raw)
-        echoed, sha_echo, matched = _read_back_until_match(fname, sha_in)
+        sha_in = sha256(raw.encode("utf-8")).hexdigest()
+        echoed = _download_text(fname)
+        sha_echo = sha256((echoed or "").encode("utf-8")).hexdigest()
 
-        # 3) risposta JSON con echo e SHA per verifica forte
+        attempts = 0
+        while sha_echo != sha_in and attempts < 5:
+            time.sleep(0.16)  # 160 ms
+            echoed = _download_text(fname)
+            sha_echo = sha256((echoed or "").encode("utf-8")).hexdigest()
+            attempts += 1
+
         payload = {
             "ok": True,
             "name": fname,
@@ -188,11 +133,10 @@ def api_text_put(name: str):
             "echo": echoed,
             "sha_in": sha_in,
             "sha_echo": sha_echo,
-            "matched": matched,
+            "matched": sha_echo == sha_in,
         }
-
         # 4) headers no-cache anche sulla risposta PUT
-        headers = _nocache_headers({"ETag": f'W/"{sha_echo}"'})
+        headers = _nocache_headers({"ETag": f'W/"{payload["sha_echo"]}"'})
         resp = make_response(jsonify(payload), 200)
         for k, v in headers.items():
             resp.headers[k] = v
@@ -219,7 +163,7 @@ def api_read_text_legacy(name: str):
                 mimetype="text/plain; charset=utf-8",
                 headers=_nocache_headers(),
             )
-        etag = _sha(txt)
+        etag = sha256(txt.encode("utf-8")).hexdigest()
         headers = _nocache_headers({
             "ETag": f'W/"{etag}"',
             "Content-Disposition": f'inline; filename="{os.path.basename(fname)}"',
@@ -237,20 +181,28 @@ def api_write_text_legacy(name: str):
         raw = request.get_data(as_text=True) or ""
         _upload_text(fname, raw)
 
-        sha_in = _sha(raw)
-        echoed, sha_echo, matched = _read_back_until_match(fname, sha_in)
+sha_in = sha256(raw.encode("utf-8")).hexdigest()
+echoed = _download_text(fname)
+sha_echo = sha256((echoed or "").encode("utf-8")).hexdigest()
 
-        payload = {
-            "ok": True,
-            "path": fname,
-            "size": len(raw),
-            "sha_in": sha_in,
-            "sha_echo": sha_echo,
-            "matched": matched,
-        }
+attempts = 0
+while sha_echo != sha_in and attempts < 5:
+    time.sleep(0.16)
+    echoed = _download_text(fname)
+    sha_echo = sha256((echoed or "").encode("utf-8")).hexdigest()
+    attempts += 1
+
+payload = {
+    "ok": True,
+    "path": fname,
+    "size": len(raw),
+    "sha_in": sha_in,
+    "sha_echo": sha_echo,
+    "matched": sha_echo == sha_in,
+}
         # no-cache anche qui
         resp = make_response(jsonify(payload), 200)
-        for k, v in _nocache_headers({"ETag": f'W/"{sha_echo}"'}).items():
+        for k, v in _nocache_headers({"ETag": f'W/"{payload["sha_echo"]}"'}).items():
             resp.headers[k] = v
         return resp
     except Exception as e:
@@ -291,7 +243,6 @@ def index():
     ix = os.path.join(PUBLIC_DIR, "index.html")
     if not os.path.exists(ix):
         return "index.html non trovato in /public", 404
-    # cache_timeout=0 per evitare che dev browser tenga versioni vecchie
     return send_from_directory(PUBLIC_DIR, "index.html", cache_timeout=0)
 
 
