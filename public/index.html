@@ -1645,30 +1645,63 @@ async function guardedFetch(url, opts){
   return res;
 }
 
+<!-- barra login/logout + wiring -->
+<script>
 // barra login/logout
 async function refreshAuthBar(){
-  try{
+  try {
     const me = await apiMe();
     const s = document.getElementById('auth-status');
-	if (btnLogin){
-  btnLogin.addEventListener('click', async ()=>{
-    const password = prompt('Password admin:');
-    if (!password) return;
-    const res = await fetch('/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify({ password })
-    });
-    const j = await res.json();
-    if (!j.ok) {
-      alert(j.error || 'Login fallito');
-      return;
+    const btnLogin = document.getElementById('btn-login');
+    const btnLogout = document.getElementById('btn-logout');
+    const canWrite = me && me.ok && me.role === 'write';
+
+    if (me && me.ok && me.user){
+      s.textContent = `👋 ${me.user} (${me.role})`;
+      if (btnLogin)  btnLogin.style.display  = 'none';
+      if (btnLogout) btnLogout.style.display = 'inline-block';
+    } else {
+      s.textContent = '👤 ospite';
+      if (btnLogin)  btnLogin.style.display  = 'inline-block';
+      if (btnLogout) btnLogout.style.display = 'none';
     }
-    await refreshAuthBar();
-  });
+    setWriteEnabled(!!canWrite);
+  } catch(e){
+    console.warn('auth refresh failed', e);
+  }
 }
+
+window.addEventListener('DOMContentLoaded', ()=>{
+  const btnLogin = document.getElementById('btn-login');
+  const btnLogout = document.getElementById('btn-logout');
+
+  if (btnLogin){
+    btnLogin.addEventListener('click', async ()=>{
+      const password = prompt('Password admin:');
+      if (!password) return;
+      const res = await fetch('/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ password })
+      });
+      const j = await res.json().catch(()=>({ok:false}));
+      if (!j.ok){ alert(j.error || 'Login fallito'); return; }
+      await refreshAuthBar();
+    });
+  }
+
+  if (btnLogout){
+    btnLogout.addEventListener('click', async ()=>{
+      await fetch('/logout', { method:'POST', credentials:'same-origin' });
+      await refreshAuthBar();
+    });
+  }
+
+  refreshAuthBar();
+});
 </script>
 
 </body>
 </html>
+
