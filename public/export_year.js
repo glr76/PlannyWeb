@@ -80,13 +80,22 @@
 
   // --- inserisci il pulsante nella UI quando il DOM è pronto ---
   function injectButton(){
-    // Trova la barra destra nella top bar (accanto a "Oggi" e al box di ricerca)
-    const barRight = document.querySelector('.tabsbar .bar-right');
-    if (!barRight){
-      // Ritenta più tardi se non ancora renderizzata
-      setTimeout(injectButton, 150);
-      return;
-    }
+  // cerca se esiste già il pulsante
+  const btn = document.getElementById('btn-export-year');
+  if (!btn){
+    console.warn('[export] nessun pulsante con id="btn-export-year" trovato');
+    return;
+  }
+
+  // collega il click (una volta sola)
+  if (!btn.__wired){
+    btn.addEventListener('click', ()=> exportYearFiles(btn));
+    btn.__wired = true;
+    console.log('[export] listener collegato al pulsante', btn);
+  } else {
+    console.log('[export] listener già collegato');
+  }
+}
 
     // Evita doppioni
     if (document.getElementById('btn-export-year')) return;
