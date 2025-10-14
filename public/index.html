@@ -691,6 +691,44 @@ function makeCell(date,name){
       e.dataTransfer.setData('text/plain', value); e.dataTransfer.effectAllowed='move';
     });
     chip.addEventListener('dragend', ()=> chip.classList.remove('dragging'));
+	
+	// --- MENU CONTESTUALE SOLO SUL CHIP ---
+
+function openCtxForChip(ev){
+  // se stai editando un input, niente menu
+  if (td.classList.contains('editing')) return;
+
+  ev.preventDefault();
+  ev.stopPropagation();
+
+  // assicura la selezione sulla cella del chip
+  if (!state.selected.size || !state.selected.has(td)) {
+    clearSelection();
+    addToSelection(td);
+  }
+  state.ctxTarget = td;
+
+  // posiziona il menu (usa clientX/Y se presenti, altrimenti vicino al chip)
+  const rect = document.body.getBoundingClientRect();
+  const r = chip.getBoundingClientRect();
+  let px = (typeof ev.clientX === 'number') ? ev.clientX : r.left;
+  let py = (typeof ev.clientY === 'number') ? ev.clientY : (r.bottom + 4);
+  px = Math.min(px, rect.width  - 200);
+  py = Math.min(py, rect.height - 10);
+
+  showCtx(px, py);
+}
+
+// 2a) evento standard (quando il browser lo emette)
+chip.addEventListener('contextmenu', openCtxForChip);
+
+// 2b) fallback affidabile anche su draggable: tasto destro via pointerdown
+chip.addEventListener('pointerdown', (ev)=>{
+  if (ev.button === 2) { // right button
+    openCtxForChip(ev);
+  }
+});
+
 
     td.appendChild(input); td.appendChild(chip); return td;
   }
@@ -1243,45 +1281,13 @@ function hideCtx(){
   state.ctxTarget = null;
 }
 
-    document.addEventListener('contextmenu', (e)=>{
-  // Normalizza il target: se è un TextNode (nodeType===3), risali al parent element
-  const t = (e.target && e.target.nodeType === 3) ? e.target.parentElement : e.target;
-
-  // niente menu se stai editando un input nella cella
-  const inInput = t?.closest?.('.cell.editing input');
-  if (inInput) return;
-
-  // MOSTRA il menu SOLO sui chip visibili (non .hidden), non sulle celle vuote
-  const chip = t?.closest?.('.chip:not(.hidden)');
-  if (!chip) { hideCtx(); return; }
-
-  const td = chip.closest('td.cell');
-  if (!td) { hideCtx(); return; }
-
-  e.preventDefault(); // blocca il menu di default del browser
-
-  // assicurati che la cella del chip sia selezionata
-  if (!state.selected.size || !state.selected.has(td)) {
-    clearSelection();
-    addToSelection(td);
-  }
-  state.ctxTarget = td;
-
-  // posiziona e mostra il menu
-  const rect = document.body.getBoundingClientRect();
-  const px = Math.min(e.clientX, rect.width  - 200);
-  const py = Math.min(e.clientY, rect.height - 10);
-  showCtx(px, py);
-});
-
-
-
 
   document.addEventListener('click', (e)=>{
-  // chiudi solo su click SINISTRO fuori dal menu
+  // chiudi solo con click SINISTRO fuori dal menu
   if (e.button !== 0) return;
   if (!e.target.closest('#ctx')) hideCtx();
 });
+
 
   document.addEventListener('scroll', hideCtx, true);
   window.addEventListener('blur', hideCtx);
