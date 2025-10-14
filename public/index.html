@@ -1217,14 +1217,22 @@ document.addEventListener('keydown', (e)=>{
 
   /* ======== CONTEXT MENU ======== */
   const ctx = document.getElementById('ctx');
+  let __ctxArmed = false; // diventa true solo dopo mousedown sinistro dentro il menu
+  ctx.addEventListener('mousedown', (e)=>{
+  // arma il menu SOLO se il tasto è il sinistro (0) e sei su una voce .itm
+  if (e.button === 0 && e.target.closest('.itm')) {
+    __ctxArmed = true;
+  }
+});
+
   function showCtx(x, y){
+   __ctxArmed = false;
   ctx.style.left = x + 'px';
   ctx.style.top  = y + 'px';
   ctx.removeAttribute('inert');
   ctx.style.display = 'block';
   ctx.setAttribute('aria-hidden','false');
   // metti a fuoco la prima voce dopo il paint
-  setTimeout(()=> ctx.querySelector('.itm')?.focus(), 0);
 }
 
 
@@ -1268,25 +1276,39 @@ function hideCtx(){
   });
 
   ctx.addEventListener('click', async (e)=>{
-    const it = e.target.closest('.itm'); if(!it) return;
-    const cmd = it.dataset.cmd;
-    hideCtx();
-    if(cmd==='copy'){ copySelectionToClipboard(); }
-    else if(cmd==='paste'){
-      const startTd = state.ctxTarget || state.anchorCell;
-      if(!startTd){ log('Seleziona una cella dove incollare.','warn'); return; }
-      await pasteFromClipboardAt(startTd);
+  const it = e.target.closest('.itm');
+  // NIENTE comando se:
+  // - non hai cliccato su una voce del menu
+  // - il menu non è "armato" da un mousedown sinistro precedente
+  if (!it || !__ctxArmed) return;
+
+  // consuma l'armatura per evitare doppi trigger
+  __ctxArmed = false;
+
+  const cmd = it.dataset.cmd;
+  hideCtx();
+
+  if(cmd==='copy'){ 
+    copySelectionToClipboard(); 
+  } else if(cmd==='paste'){
+    const startTd = state.ctxTarget || state.anchorCell;
+    if(!startTd){ log('Seleziona una cella dove incollare.','warn'); return; }
+    await pasteFromClipboardAt(startTd);
+  } else if(cmd==='clear'){
+    if(state.selected.size){
+      state.selected.forEach(td => writeCell(td, ''));
+      if(state.search.q) buildSearchHits(state.search.q);
+      log('Celle cancellate.','cell');
+      saveNow();
+    } else if(state.ctxTarget){
+      writeCell(state.ctxTarget,'');
+      if(state.search.q) buildSearchHits(state.search.q);
+      log('Cella cancellata.','cell');
+      saveNow();
     }
-    else if(cmd==='clear'){
-      if(state.selected.size){
-        state.selected.forEach(td => writeCell(td, ''));
-        if(state.search.q) buildSearchHits(state.search.q);
-        log('Celle cancellate.','cell'); saveNow();
-      }else if(state.ctxTarget){
-        writeCell(state.ctxTarget,''); if(state.search.q) buildSearchHits(state.search.q);
-      }
-    }
-  });
+  }
+});
+
 
   /* ======== SEARCH ======== */
   const qEl = document.getElementById('search-q');
