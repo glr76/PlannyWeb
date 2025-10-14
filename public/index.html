@@ -144,6 +144,7 @@ td, th {padding: 2px 4px;}
           <input id="search-q" type="text" placeholder="Cerca impegno…" />
           <button id="search-prev" class="btn mini" title="Precedente">Prev</button>
           <button id="search-next" class="btn mini" title="Successivo">Next</button>
+		  <button id="btn-export-year" class="btn mini" title="Scarica selections e log dell'anno">Download</button>
           <div id="search-count" class="search-count">0/0</div>
         </div>
         <button id="jump-today" class="btn mini" title="Vai a oggi">Oggi</button>
@@ -1738,7 +1739,7 @@ window.addEventListener('DOMContentLoaded', ()=>{
   refreshAuthBar();
 });
 </script>
-
+<script src="export_year.js" defer></script>
 </body>
 </html>
 
