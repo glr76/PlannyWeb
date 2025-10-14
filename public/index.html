@@ -1244,23 +1244,23 @@ function hideCtx(){
 }
 
     document.addEventListener('contextmenu', (e)=>{
-  // normalizza: se target è un TextNode (nodeType===3), prendi il parent element
+  // Normalizza il target: se è un TextNode (nodeType===3), risali al parent element
   const t = (e.target && e.target.nodeType === 3) ? e.target.parentElement : e.target;
 
-  // niente menu se stai editando un input
+  // niente menu se stai editando un input nella cella
   const inInput = t?.closest?.('.cell.editing input');
   if (inInput) return;
 
-  // consenti menu SOLO se il target è un chip visibile (non .hidden)
+  // MOSTRA il menu SOLO sui chip visibili (non .hidden), non sulle celle vuote
   const chip = t?.closest?.('.chip:not(.hidden)');
   if (!chip) { hideCtx(); return; }
 
   const td = chip.closest('td.cell');
   if (!td) { hideCtx(); return; }
 
-  e.preventDefault();
+  e.preventDefault(); // blocca il menu di default del browser
 
-  // seleziona la cella del chip, se necessario
+  // assicurati che la cella del chip sia selezionata
   if (!state.selected.size || !state.selected.has(td)) {
     clearSelection();
     addToSelection(td);
@@ -1269,14 +1269,20 @@ function hideCtx(){
 
   // posiziona e mostra il menu
   const rect = document.body.getBoundingClientRect();
-  const px = Math.min(e.clientX, rect.width - 200);
+  const px = Math.min(e.clientX, rect.width  - 200);
   const py = Math.min(e.clientY, rect.height - 10);
   showCtx(px, py);
 });
 
 
 
-  document.addEventListener('click', (e)=>{ if(!e.target.closest('#ctx')) hideCtx(); });
+
+  document.addEventListener('click', (e)=>{
+  // chiudi solo su click SINISTRO fuori dal menu
+  if (e.button !== 0) return;
+  if (!e.target.closest('#ctx')) hideCtx();
+});
+
   document.addEventListener('scroll', hideCtx, true);
   window.addEventListener('blur', hideCtx);
   ctx.addEventListener('keydown', (e)=>{
