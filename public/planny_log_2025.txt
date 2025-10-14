@@ -582,3 +582,4 @@
 [11:39:29 PM] MOVE 15-10-2025, Giuseppe,FRIZZI → 16-10-2025, Giuseppe
 [11:39:35 PM] MOVE 16-10-2025, Giuseppe,FRIZZI → 15-10-2025, Giuseppe
 [11:41:52 PM] SET 16-10-2025, Giuseppe,prova
+[10/14/2025, 8:48:20 AM] Sessione avviata su https://plannyweb.onrender.com/
