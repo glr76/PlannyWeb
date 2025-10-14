@@ -1059,7 +1059,7 @@
 20-10-2025,Alfredo,Assente
 20-10-2025,Fabio,UM9243
 20-10-2025,Fabrizio,Ferie
-20-10-2025,Giuseppe,ci
+20-10-2025,Giuseppe,__DEL__
 20-10-2025,Lorenzo,OS7283
 20-10-2025,Michelangelo,CH3556
 21-10-2025,Alfredo,Assente
