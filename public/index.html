@@ -544,12 +544,25 @@ async function saveSelectionsToServer(){
   
 
   /* ------- Editing / Commit ------- */
-  function enterEdit(td){
-    td.classList.add('editing');
-    const input=td.querySelector('input'), chip=td.querySelector('.chip');
-    chip.classList.add('hidden'); input.classList.remove('hidden');
-    input.dataset.orig=input.value; setTimeout(()=>{input.focus(); input.select(); suggest.open(input);},0);
-  }
+  function enterEdit(td, initialChar=null){
+  td.classList.add('editing');
+  const input = td.querySelector('input'), chip = td.querySelector('.chip');
+  chip.classList.add('hidden'); input.classList.remove('hidden');
+  input.dataset.orig = input.value;
+
+  setTimeout(()=>{
+    input.focus();
+    if (initialChar != null) {
+      // avvio da tastiera: imposta il primo carattere e metti il cursore in coda
+      input.value = initialChar;
+      try { input.setSelectionRange(input.value.length, input.value.length); } catch(_){}
+    } else {
+      // avvio da mouse (dblclick, ecc.): seleziona tutto
+      try { input.select(); } catch(_){}
+    }
+    suggest.open(input);
+  }, 0);
+}
   function onCellCommit(input){
     // delega a writeCell per garantire logging unico
     const td = input.closest('td.cell');
@@ -1174,15 +1187,10 @@ document.addEventListener('keydown', (e)=>{
         const isPrintable = key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
         const isF2 = key === 'F2';
         if(isPrintable || isF2){
-          e.preventDefault();
-          enterEdit(td);
-          const input = td.querySelector('input');
-          if(isPrintable && input){
-            input.value = key;
-            try{ input.setSelectionRange(input.value.length, input.value.length); }catch(_){}
-          }
-          return;
-        }
+		  e.preventDefault();
+		  enterEdit(td, isPrintable ? e.key : null);
+		  return;
+		}
       }
     }
 
