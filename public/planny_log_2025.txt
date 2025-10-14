@@ -584,4 +584,4 @@
 [11:41:52 PM] SET 16-10-2025, Giuseppe,prova
 [10/14/2025, 8:48:20 AM] Sessione avviata su https://plannyweb.onrender.com/
 [4:50:22 PM] SET 16-10-2025, Lorenzo,pippo
-[10/14/2025, 5:06:31 PM] Sessione avviata su https://plannyweb.onrender.com/
+[10/14/2025, 5:06:32 PM] Sessione avviata su https://plannyweb.onrender.com/
