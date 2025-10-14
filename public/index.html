@@ -544,25 +544,12 @@ async function saveSelectionsToServer(){
   
 
   /* ------- Editing / Commit ------- */
-  function enterEdit(td, initialChar=null){
-  td.classList.add('editing');
-  const input = td.querySelector('input'), chip = td.querySelector('.chip');
-  chip.classList.add('hidden'); input.classList.remove('hidden');
-  input.dataset.orig = input.value;
-
-  setTimeout(()=>{
-    input.focus();
-    if (initialChar != null) {
-      // avvio da tastiera: imposta il primo carattere e metti il cursore in coda
-      input.value = initialChar;
-      try { input.setSelectionRange(input.value.length, input.value.length); } catch(_){}
-    } else {
-      // avvio da mouse (dblclick, ecc.): seleziona tutto
-      try { input.select(); } catch(_){}
-    }
-    suggest.open(input);
-  }, 0);
-}
+  function enterEdit(td){
+    td.classList.add('editing');
+    const input=td.querySelector('input'), chip=td.querySelector('.chip');
+    chip.classList.add('hidden'); input.classList.remove('hidden');
+    input.dataset.orig=input.value; setTimeout(()=>{input.focus(); input.select(); suggest.open(input);},0);
+  }
   function onCellCommit(input){
     // delega a writeCell per garantire logging unico
     const td = input.closest('td.cell');
@@ -691,44 +678,6 @@ function makeCell(date,name){
       e.dataTransfer.setData('text/plain', value); e.dataTransfer.effectAllowed='move';
     });
     chip.addEventListener('dragend', ()=> chip.classList.remove('dragging'));
-	
-	// --- MENU CONTESTUALE SOLO SUL CHIP ---
-
-function openCtxForChip(ev){
-  // se stai editando un input, niente menu
-  if (td.classList.contains('editing')) return;
-
-  ev.preventDefault();
-  ev.stopPropagation();
-
-  // assicura la selezione sulla cella del chip
-  if (!state.selected.size || !state.selected.has(td)) {
-    clearSelection();
-    addToSelection(td);
-  }
-  state.ctxTarget = td;
-
-  // posiziona il menu (usa clientX/Y se presenti, altrimenti vicino al chip)
-  const rect = document.body.getBoundingClientRect();
-  const r = chip.getBoundingClientRect();
-  let px = (typeof ev.clientX === 'number') ? ev.clientX : r.left;
-  let py = (typeof ev.clientY === 'number') ? ev.clientY : (r.bottom + 4);
-  px = Math.min(px, rect.width  - 200);
-  py = Math.min(py, rect.height - 10);
-
-  showCtx(px, py);
-}
-
-// 2a) evento standard (quando il browser lo emette)
-chip.addEventListener('contextmenu', openCtxForChip);
-
-// 2b) fallback affidabile anche su draggable: tasto destro via pointerdown
-chip.addEventListener('pointerdown', (ev)=>{
-  if (ev.button === 2) { // right button
-    openCtxForChip(ev);
-  }
-});
-
 
     td.appendChild(input); td.appendChild(chip); return td;
   }
@@ -1225,10 +1174,15 @@ document.addEventListener('keydown', (e)=>{
         const isPrintable = key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
         const isF2 = key === 'F2';
         if(isPrintable || isF2){
-		  e.preventDefault();
-		  enterEdit(td, isPrintable ? e.key : null);
-		  return;
-		}
+          e.preventDefault();
+          enterEdit(td);
+          const input = td.querySelector('input');
+          if(isPrintable && input){
+            input.value = key;
+            try{ input.setSelectionRange(input.value.length, input.value.length); }catch(_){}
+          }
+          return;
+        }
       }
     }
 
@@ -1263,12 +1217,16 @@ document.addEventListener('keydown', (e)=>{
 
   /* ======== CONTEXT MENU ======== */
   const ctx = document.getElementById('ctx');
-  function showCtx(x,y){
+  function showCtx(x, y){
+  ctx.style.left = x + 'px';
+  ctx.style.top  = y + 'px';
   ctx.removeAttribute('inert');
   ctx.style.display = 'block';
   ctx.setAttribute('aria-hidden','false');
-  ctx.querySelector('.itm')?.focus();
+  // metti a fuoco la prima voce dopo il paint
+  setTimeout(()=> ctx.querySelector('.itm')?.focus(), 0);
 }
+
 
 function hideCtx(){
   if (ctx.contains(document.activeElement)) {
@@ -1281,14 +1239,23 @@ function hideCtx(){
   state.ctxTarget = null;
 }
 
+    document.addEventListener('contextmenu', (e)=>{
+    const inInput = e.target.closest?.('.cell.editing input');
+    if(inInput){ return; }
+    const td = e.target.closest?.('td.cell');
+    if(!td){ hideCtx(); return; }
+    e.preventDefault();
+    if(!state.selected.size || !state.selected.has(td)){
+      clearSelection(); addToSelection(td);
+    }
+    state.ctxTarget = td;
+    const rect = document.body.getBoundingClientRect();
+    const px = Math.min(e.clientX, rect.width - 200);
+    const py = Math.min(e.clientY, rect.height - 10);
+    showCtx(px,py);
+  });
 
-  document.addEventListener('click', (e)=>{
-  // chiudi solo con click SINISTRO fuori dal menu
-  if (e.button !== 0) return;
-  if (!e.target.closest('#ctx')) hideCtx();
-});
-
-
+  document.addEventListener('click', (e)=>{ if(!e.target.closest('#ctx')) hideCtx(); });
   document.addEventListener('scroll', hideCtx, true);
   window.addEventListener('blur', hideCtx);
   ctx.addEventListener('keydown', (e)=>{
