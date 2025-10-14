@@ -598,3 +598,4 @@
 [10/14/2025, 6:18:50 PM] Sessione avviata su https://plannyweb.onrender.com/
 [10/14/2025, 6:19:00 PM] Sessione avviata su https://plannyweb.onrender.com/
 [10/14/2025, 6:19:00 PM] Sessione avviata su https://plannyweb.onrender.com/
+[6:19:12 PM] MOVE 16-10-2025, Fabrizio,Ferie → 17-10-2025, Fabrizio
