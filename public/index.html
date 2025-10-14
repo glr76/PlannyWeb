@@ -1244,20 +1244,33 @@ function hideCtx(){
 }
 
     document.addEventListener('contextmenu', (e)=>{
-    const inInput = e.target.closest?.('.cell.editing input');
-    if(inInput){ return; }
-    const td = e.target.closest?.('td.cell');
-    if(!td){ hideCtx(); return; }
-    e.preventDefault();
-    if(!state.selected.size || !state.selected.has(td)){
-      clearSelection(); addToSelection(td);
-    }
-    state.ctxTarget = td;
-    const rect = document.body.getBoundingClientRect();
-    const px = Math.min(e.clientX, rect.width - 200);
-    const py = Math.min(e.clientY, rect.height - 10);
-    showCtx(px,py);
-  });
+  // niente menu se stai editando un input
+  const inInput = e.target.closest?.('.cell.editing input');
+  if (inInput) return;
+
+  // consenti menu SOLO se il target è un chip visibile
+  const chip = e.target.closest?.('.chip:not(.hidden)');
+  if (!chip) { hideCtx(); return; }
+
+  const td = chip.closest('td.cell');
+  if (!td) { hideCtx(); return; }
+
+  e.preventDefault();
+
+  // assicurati che la cella del chip sia selezionata
+  if (!state.selected.size || !state.selected.has(td)) {
+    clearSelection();
+    addToSelection(td);
+  }
+  state.ctxTarget = td;
+
+  // posiziona il menu
+  const rect = document.body.getBoundingClientRect();
+  const px = Math.min(e.clientX, rect.width - 200);
+  const py = Math.min(e.clientY, rect.height - 10);
+  showCtx(px, py);
+});
+
 
   document.addEventListener('click', (e)=>{ if(!e.target.closest('#ctx')) hideCtx(); });
   document.addEventListener('scroll', hideCtx, true);
