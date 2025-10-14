@@ -592,3 +592,4 @@
 [10/14/2025, 5:43:32 PM] Sessione avviata su https://plannyweb.onrender.com/
 [10/14/2025, 5:43:32 PM] Sessione avviata su https://plannyweb.onrender.com/
 [10/14/2025, 6:02:07 PM] Sessione avviata su https://plannyweb.onrender.com/
+[6:02:18 PM] SET 20-10-2025, Giuseppe,ci
