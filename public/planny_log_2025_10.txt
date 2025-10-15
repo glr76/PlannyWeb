@@ -1,14 +1,1 @@
-[8:04:27 AM] MOVE 20-10-2025, Fabrizio,Ferie → 20-10-2025, Gabriele
-[8:04:36 AM] MOVE 20-10-2025, Gabriele,Ferie → 20-10-2025, Fabrizio
-[8:04:43 AM] MOVE 20-10-2025, Fabrizio,Ferie → 22-10-2025, Fabrizio
-[8:04:48 AM] MOVE 22-10-2025, Fabrizio,Ferie → 20-10-2025, Fabrizio
-[9:37:49 AM] MOVE 22-10-2025, Lorenzo,PT3011 → 22-10-2025, Fabrizio
-[9:37:55 AM] MOVE 22-10-2025, Fabrizio,PT3011 → 22-10-2025, Lorenzo
-[11:25:05 AM] MOVE 16-10-2025, Fabrizio,Ferie → 16-10-2025, Lorenzo
-[11:25:10 AM] MOVE 16-10-2025, Lorenzo,Ferie → 16-10-2025, Fabrizio
-[11:49:37 AM] MOVE 16-10-2025, Fabrizio,Ferie → 16-10-2025, Lorenzo
-[11:49:44 AM] MOVE 16-10-2025, Lorenzo,Ferie → 16-10-2025, Fabrizio
-[12:32:15] MOVE 25-10-2025, Raffaele,CAM4930 → 24-10-2025, Raffaele
-[12:32:18] MOVE 24-10-2025, Raffaele,CAM4930 → 25-10-2025, Raffaele
-[12:32:33] SET 25-10-2025, Giuseppe,CAM4930
-[12:32:38] SET 25-10-2025, Lorenzo,CAM4930
+[13:11:49] MOVE 17-10-2025, Gabriele,TS1 → 17-10-2025, Michelangelo
