@@ -15,3 +15,4 @@
 [10/14/2025, 7:03:13 PM] Sessione avviata su https://plannyweb.onrender.com/
 [10/15/2025, 7:36:37 AM] Sessione avviata su https://plannyweb.onrender.com/
 [7:36:45 AM] MOVE 22-10-2025, Lorenzo,PT3011 → 23-10-2025, Lorenzo
+[7:36:50 AM] MOVE 23-10-2025, Lorenzo,PT3011 → 22-10-2025, Fabrizio
