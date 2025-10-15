@@ -10,3 +10,5 @@
 [11:49:44 AM] MOVE 16-10-2025, Lorenzo,Ferie → 16-10-2025, Fabrizio
 [12:32:15] MOVE 25-10-2025, Raffaele,CAM4930 → 24-10-2025, Raffaele
 [12:32:18] MOVE 24-10-2025, Raffaele,CAM4930 → 25-10-2025, Raffaele
+[12:32:33] SET 25-10-2025, Giuseppe,CAM4930
+[12:32:38] SET 25-10-2025, Lorenzo,CAM4930
