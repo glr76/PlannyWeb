@@ -127,21 +127,24 @@ td, th {padding: 2px 4px;}
 #calendar {margin-left:0;margin-right:0;}
 </style>
 <style>
-  /* La barra in alto fa da contenitore di posizionamento */
+  /* La barra in alto diventa il contenitore di riferimento */
   .tabsbar { position: relative; }
 
-  /* Il blocco login centrato nella barra */
+  /* Centra il blocco login (#auth-bar) dentro la barra */
   #auth-bar{
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    top: 4px;                     /* regola 0–10px per l'allineamento verticale */
+    top: 4px; /* se risulta troppo alto/basso, regola questo numero */
     display: flex; align-items: center; gap: .5rem;
-    background: transparent; border: 0; margin: 0; padding: 0;
+    background: transparent;
+    padding: 0 !important;   /* override degli stili inline esistenti */
+    margin: 0 !important;
+    border: 0 !important;
     white-space: nowrap; z-index: 2;
   }
 
-  /* Bottoni coerenti col resto (ritocchi) */
+  /* (facoltativo) uniforma i bottoni del login */
   #auth-bar #btn-login,
   #auth-bar #btn-logout{
     border: 1px solid var(--border);
@@ -150,14 +153,15 @@ td, th {padding: 2px 4px;}
     padding: 6px 10px; border-radius: 10px; font-size: 12px;
   }
 
-  /* Se serve più spazio verticale alla barra */
+  /* (se serve) un po' più spazio verticale alla barra */
   .tabsbar{ min-height: 40px; padding-top: 6px; padding-bottom: 6px; }
 
-  /* Mobile: impila e centra */
+  /* Su schermi piccoli: manda il login a capo e centrato */
   @media (max-width: 720px){
-    #auth-bar{ position: static; transform:none; margin-top:6px; justify-content:center; }
+    #auth-bar{ position: static; transform: none; margin-top: 6px; justify-content: center; }
   }
 </style>
+
 
 </head>
 <body>
@@ -1845,41 +1849,27 @@ window.addEventListener('DOMContentLoaded', ()=>{
 });
 </script>
 <script>
-  // Sposta il box login dentro la barra e lascialo al centro (CSS già sopra lo centra)
   (function(){
-    const BAR_SELECTORS  = ['.tabsbar', '.topbar', '.headerbar'];
-    const AUTH_SELECTORS = ['#auth-bar', '#loginbar', '.auth-bar', '.auth'];
+    // Se la tua barra si chiama diversamente (.topbar/.headerbar), cambia qui:
+    const bar  = document.querySelector('.tabsbar');
+    const auth = document.getElementById('auth-bar');
 
-    const findFirst = (sels) => sels.map(s => document.querySelector(s)).find(Boolean);
-
-    function moveAuthIntoBar(){
-      const bar  = findFirst(BAR_SELECTORS);
-      const auth = findFirst(AUTH_SELECTORS);
-
-      if (!bar || !auth){
-        // Ritenta un attimo dopo nel caso la UI non sia ancora renderizzata
-        setTimeout(moveAuthIntoBar, 150);
-        return;
-      }
-
-      // Se il blocco login non è già figlio della barra, spostalo lì
+    function move(){
+      if (!bar || !auth) return;
+      // Sposta #auth-bar DENTRO .tabsbar (necessario per centrarlo tra sinistra e destra)
       if (auth.parentElement !== bar){
         bar.appendChild(auth);
       }
-      // opzionale: se hai un'etichetta prolissa, puoi nasconderla
-      // document.getElementById('auth-status')?.classList.add('hidden');
-
-      // Debug utili (puoi rimuoverli)
-      // console.log('[auth-center] spostato', {bar, auth});
     }
 
     if (document.readyState === 'loading'){
-      document.addEventListener('DOMContentLoaded', moveAuthIntoBar);
+      document.addEventListener('DOMContentLoaded', move);
     } else {
-      moveAuthIntoBar();
+      move();
     }
   })();
 </script>
+
 
 <script src="export_year.js" defer></script>
 
