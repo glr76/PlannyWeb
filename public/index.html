@@ -126,6 +126,39 @@ td, th {padding: 2px 4px;}
 #calendar-container {margin-left:0;margin-right:0;padding-left:4px;padding-right:4px;max-width:100%;}
 #calendar {margin-left:0;margin-right:0;}
 </style>
+<style>
+  /* La barra in alto fa da contenitore di posizionamento */
+  .tabsbar { position: relative; }
+
+  /* Il blocco login centrato nella barra */
+  #auth-bar{
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 4px;                     /* regola 0–10px per l'allineamento verticale */
+    display: flex; align-items: center; gap: .5rem;
+    background: transparent; border: 0; margin: 0; padding: 0;
+    white-space: nowrap; z-index: 2;
+  }
+
+  /* Bottoni coerenti col resto (ritocchi) */
+  #auth-bar #btn-login,
+  #auth-bar #btn-logout{
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    padding: 6px 10px; border-radius: 10px; font-size: 12px;
+  }
+
+  /* Se serve più spazio verticale alla barra */
+  .tabsbar{ min-height: 40px; padding-top: 6px; padding-bottom: 6px; }
+
+  /* Mobile: impila e centra */
+  @media (max-width: 720px){
+    #auth-bar{ position: static; transform:none; margin-top:6px; justify-content:center; }
+  }
+</style>
+
 </head>
 <body>
 <div class="wrap">
@@ -144,10 +177,10 @@ td, th {padding: 2px 4px;}
           <input id="search-q" type="text" placeholder="Cerca impegno…" />
           <button id="search-prev" class="btn mini" title="Precedente">Prev</button>
           <button id="search-next" class="btn mini" title="Successivo">Next</button>
-		  <button id="btn-export-year" class="btn mini" title="Scarica selections e log dell'anno">Download</button>
-          <div id="search-count" class="search-count">0/0</div>
+		  <div id="search-count" class="search-count">0/0</div>
         </div>
         <button id="jump-today" class="btn mini" title="Vai a oggi">Oggi</button>
+		<button id="btn-export-year" class="btn mini" title="Scarica selections e log dell'anno">Download</button>
       </div>
     </div>
     <div id="month" class="month">
@@ -1811,7 +1844,45 @@ window.addEventListener('DOMContentLoaded', ()=>{
   refreshAuthBar();
 });
 </script>
+<script>
+  // Sposta il box login dentro la barra e lascialo al centro (CSS già sopra lo centra)
+  (function(){
+    const BAR_SELECTORS  = ['.tabsbar', '.topbar', '.headerbar'];
+    const AUTH_SELECTORS = ['#auth-bar', '#loginbar', '.auth-bar', '.auth'];
+
+    const findFirst = (sels) => sels.map(s => document.querySelector(s)).find(Boolean);
+
+    function moveAuthIntoBar(){
+      const bar  = findFirst(BAR_SELECTORS);
+      const auth = findFirst(AUTH_SELECTORS);
+
+      if (!bar || !auth){
+        // Ritenta un attimo dopo nel caso la UI non sia ancora renderizzata
+        setTimeout(moveAuthIntoBar, 150);
+        return;
+      }
+
+      // Se il blocco login non è già figlio della barra, spostalo lì
+      if (auth.parentElement !== bar){
+        bar.appendChild(auth);
+      }
+      // opzionale: se hai un'etichetta prolissa, puoi nasconderla
+      // document.getElementById('auth-status')?.classList.add('hidden');
+
+      // Debug utili (puoi rimuoverli)
+      // console.log('[auth-center] spostato', {bar, auth});
+    }
+
+    if (document.readyState === 'loading'){
+      document.addEventListener('DOMContentLoaded', moveAuthIntoBar);
+    } else {
+      moveAuthIntoBar();
+    }
+  })();
+</script>
+
 <script src="export_year.js" defer></script>
+
 </body>
 </html>
 
