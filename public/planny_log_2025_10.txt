@@ -1,3 +1,7 @@
 [13:11:49] MOVE 17-10-2025, Gabriele,TS1 → 17-10-2025, Michelangelo
 [5:55:09 PM] SET 07-01-2025, Lorenzo,hhh
 [6:07:34 PM] SET 24-10-2025, Fabrizio,dddd
+[6:07:22 PM] SET 24-10-2025, Fabrizio,rova
+[6:07:27 PM] SET 24-10-2025, Lorenzo,ddddd
+[6:07:53 PM] DELETE 24-10-2025, Fabrizio,rova
+[6:07:53 PM] Celle cancellate.
