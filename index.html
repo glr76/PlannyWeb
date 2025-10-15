@@ -126,25 +126,37 @@ td, th {padding: 2px 4px;}
 #calendar-container {margin-left:0;margin-right:0;padding-left:4px;padding-right:4px;max-width:100%;}
 #calendar {margin-left:0;margin-right:0;}
 </style>
+<style>
+  .topbar-grid{
+    display:grid;
+    grid-template-columns:1fr auto 1fr;
+    align-items:center;
+    column-gap:12px;
+    padding:6px 12px;
+    margin-bottom:8px;
+  }
+  .topbar-left{ justify-self:start; }
+  .topbar-center{ justify-self:center; }
+  .topbar-right{ justify-self:end; display:flex; align-items:center; gap:8px; }
+
+  #cloud-year-box{ display:flex; gap:8px; align-items:center; }
+  #auth-bar{ display:flex; gap:.5rem; align-items:center; padding:0!important; margin:0!important; border:0!important; background:transparent!important; }
+
+  .topbar-right #save-status{
+    position: static !important;
+    right:auto!important; top:auto!important; margin:0!important;
+  }
+</style>
+
 </head>
 <body>
 <div class="wrap">
-  <h1>Planny (HTML)</h1>
   
 <div id="auth-bar" style="display:flex;gap:.5rem;align-items:center;justify-content:flex-end;padding:.5rem 1rem;border-bottom:1px solid #eee;margin-bottom:8px">
   <span id="auth-status">👤 ospite</span>
   <button id="btn-login">Login</button>
   <button id="btn-logout" style="display:none">Logout</button>
 </div>
-
-  <div class="card">
-    <div class="bar">
-      <div><label>Anno</label><input id="year" type="number" min="1900" max="2100" disabled /></div>
-      <div><label>Nomi Team</label><input id="names" type="text" disabled /></div>
-      <div><label>Opzioni</label><input id="options" type="text" disabled /></div>
-      <div style="grid-column: span 5"></div>
-    </div>
-  </div>
 
   <div class="card" style="margin-top:10px">
     <div class="tabsbar">
@@ -154,9 +166,10 @@ td, th {padding: 2px 4px;}
           <input id="search-q" type="text" placeholder="Cerca impegno…" />
           <button id="search-prev" class="btn mini" title="Precedente">Prev</button>
           <button id="search-next" class="btn mini" title="Successivo">Next</button>
-          <div id="search-count" class="search-count">0/0</div>
+		  <div id="search-count" class="search-count">0/0</div>
         </div>
         <button id="jump-today" class="btn mini" title="Vai a oggi">Oggi</button>
+		<button id="btn-export-year" class="btn mini" title="Scarica selections e log dell'anno">Download</button>
       </div>
     </div>
     <div id="month" class="month">
@@ -369,13 +382,12 @@ async function appendLogsToServer(opts={force:false}){
     log('Permessi insufficienti: effettua il login come admin per salvare.', 'warn');
     return;
   }
-  const year = state.year;
-  const name = `planny_log_${year}.txt`;
+	const year = state.year;
+	const now  = new Date();
+	const mm   = String(now.getMonth()+1).padStart(2,'0');
+	const name = `planny_log_${year}_${mm}.txt`; // log mensile: es. planny_log_2025_10.txt
 
   let chunk = logsChunkSinceCursor();
-  if (!chunk && opts.force){
-    chunk = `[${new Date().toLocaleString()}] Sessione avviata su ${location.href}\n`;
-  }
   if (!chunk) return;
 
   const taskId = `log:${name}:${Date.now()}`;
@@ -390,9 +402,82 @@ async function appendLogsToServer(opts={force:false}){
     await putTextToServer(name, merged);
     log('Log aggiornato (PUT) su server: '+name, 'ok');
     __SaveTracker.ok(taskId);
+	async function purgeMonthlyLogsKeepPrevAndCurrent(){
+  try{
+    const today  = new Date();
+    const curY   = state.year || today.getFullYear();
+    const curM   = today.getMonth() + 1;
+    const { y: prevY, m: prevM } = prevMonthTuple(today);
+
+    const keep = new Set([
+      `planny_log_${prevY}_${String(prevM).padStart(2,'0')}.txt`,
+      `planny_log_${curY}_${String(curM).padStart(2,'0')}.txt`,
+    ]);
+
+    // Limitiamoci ad anno corrente + precedente (basta per retention)
+    const years = new Set([curY, curY - 1]);
+
+    for (const Y of years){
+      for (let M=1; M<=12; M++){
+        const fname = `planny_log_${Y}_${String(M).padStart(2,'0')}.txt`;
+        if (!keep.has(fname)){
+          try{
+            await putTextToServer(fname, ''); // tronca (se non esiste, ignora)
+			// Avvia retention una sola volta per sessione: tieni SOLO mese precedente + mese corrente
+if (!window.__logPurgeDoneForSession){
+  window.__logPurgeDoneForSession = true;
+  purgeMonthlyLogsKeepPrevAndCurrent();
+}
+
+          }catch(_){}
+        }
+      }
+    }
+  }catch(e){
+    log('Errore purgeMonthlyLogs: ' + (e.message||e), 'warn');
+  }
+}
   }catch(err){
     __SaveTracker.fail(taskId, err);
     throw err; // nessun fallback locale
+  }
+}
+
+function prevMonthTuple(base=new Date()){
+  const d = new Date(base.getFullYear(), base.getMonth(), 1);
+  d.setMonth(d.getMonth() - 1);
+  return { y: d.getFullYear(), m: d.getMonth() + 1 };
+}
+
+// Mantiene solo: log del mese precedente + mese corrente (tronca gli altri)
+async function purgeMonthlyLogsKeepPrevAndCurrent(){
+  try{
+    const today  = new Date();
+    const curY   = state.year || today.getFullYear();
+    const curM   = today.getMonth() + 1;
+    const { y: prevY, m: prevM } = prevMonthTuple(today);
+
+    const keep = new Set([
+      `planny_log_${prevY}_${String(prevM).padStart(2,'0')}.txt`,
+      `planny_log_${curY}_${String(curM).padStart(2,'0')}.txt`,
+    ]);
+
+    // Limitiamoci ad anno corrente + precedente (basta per retention)
+    const years = new Set([curY, curY - 1]);
+
+    for (const Y of years){
+      for (let M=1; M<=12; M++){
+        const fname = `planny_log_${Y}_${String(M).padStart(2,'0')}.txt`;
+        if (!keep.has(fname)){
+          try{
+            await putTextToServer(fname, ''); // tronca (se non esiste, ignora)
+			
+          }catch(_){}
+        }
+      }
+    }
+  }catch(e){
+    log('Errore purgeMonthlyLogs: ' + (e.message||e), 'warn');
   }
 }
 
@@ -867,7 +952,7 @@ function makeCell(date,name){
       save.logName = 'planny_log_'+state.year+'.txt';
       loadHolidaysFromLocalOrWeb().then(()=>{
         renderAndJumpToToday();
-        appendLogsToServer({force:true});
+        appendLogsToServer();
       });
     }catch(e){
       log('Errore reconfigureAfterYearChange: '+(e.message||e),'warn');
@@ -1227,10 +1312,37 @@ document.addEventListener('keydown', (e)=>{
 
   /* ======== CONTEXT MENU ======== */
   const ctx = document.getElementById('ctx');
-  function showCtx(x,y){ ctx.style.left=x+'px'; ctx.style.top=y+'px'; ctx.style.display='block'; ctx.setAttribute('aria-hidden','false'); ctx.querySelector('.itm')?.focus(); }
-  function hideCtx(){ ctx.style.display='none'; ctx.setAttribute('aria-hidden','true'); state.ctxTarget=null; }
+  let __ctxArmed = false; // diventa true solo dopo mousedown sinistro dentro il menu
+  ctx.addEventListener('mousedown', (e)=>{
+  // arma il menu SOLO se il tasto è il sinistro (0) e sei su una voce .itm
+  if (e.button === 0 && e.target.closest('.itm')) {
+    __ctxArmed = true;
+  }
+});
 
-  document.addEventListener('contextmenu', (e)=>{
+  function showCtx(x, y){
+   __ctxArmed = false;
+  ctx.style.left = x + 'px';
+  ctx.style.top  = y + 'px';
+  ctx.removeAttribute('inert');
+  ctx.style.display = 'block';
+  ctx.setAttribute('aria-hidden','false');
+  // metti a fuoco la prima voce dopo il paint
+}
+
+
+function hideCtx(){
+  if (ctx.contains(document.activeElement)) {
+    document.activeElement.blur();
+    (state.anchorCell?.querySelector('input') || document.body).focus();
+  }
+  ctx.setAttribute('inert','');
+  ctx.style.display = 'none';
+  ctx.setAttribute('aria-hidden','true');
+  state.ctxTarget = null;
+}
+
+    document.addEventListener('contextmenu', (e)=>{
     const inInput = e.target.closest?.('.cell.editing input');
     if(inInput){ return; }
     const td = e.target.closest?.('td.cell');
@@ -1259,25 +1371,39 @@ document.addEventListener('keydown', (e)=>{
   });
 
   ctx.addEventListener('click', async (e)=>{
-    const it = e.target.closest('.itm'); if(!it) return;
-    const cmd = it.dataset.cmd;
-    hideCtx();
-    if(cmd==='copy'){ copySelectionToClipboard(); }
-    else if(cmd==='paste'){
-      const startTd = state.ctxTarget || state.anchorCell;
-      if(!startTd){ log('Seleziona una cella dove incollare.','warn'); return; }
-      await pasteFromClipboardAt(startTd);
+  const it = e.target.closest('.itm');
+  // NIENTE comando se:
+  // - non hai cliccato su una voce del menu
+  // - il menu non è "armato" da un mousedown sinistro precedente
+  if (!it || !__ctxArmed) return;
+
+  // consuma l'armatura per evitare doppi trigger
+  __ctxArmed = false;
+
+  const cmd = it.dataset.cmd;
+  hideCtx();
+
+  if(cmd==='copy'){ 
+    copySelectionToClipboard(); 
+  } else if(cmd==='paste'){
+    const startTd = state.ctxTarget || state.anchorCell;
+    if(!startTd){ log('Seleziona una cella dove incollare.','warn'); return; }
+    await pasteFromClipboardAt(startTd);
+  } else if(cmd==='clear'){
+    if(state.selected.size){
+      state.selected.forEach(td => writeCell(td, ''));
+      if(state.search.q) buildSearchHits(state.search.q);
+      log('Celle cancellate.','cell');
+      saveNow();
+    } else if(state.ctxTarget){
+      writeCell(state.ctxTarget,'');
+      if(state.search.q) buildSearchHits(state.search.q);
+      log('Cella cancellata.','cell');
+      saveNow();
     }
-    else if(cmd==='clear'){
-      if(state.selected.size){
-        state.selected.forEach(td => writeCell(td, ''));
-        if(state.search.q) buildSearchHits(state.search.q);
-        log('Celle cancellate.','cell'); saveNow();
-      }else if(state.ctxTarget){
-        writeCell(state.ctxTarget,''); if(state.search.q) buildSearchHits(state.search.q);
-      }
-    }
-  });
+  }
+});
+
 
   /* ======== SEARCH ======== */
   const qEl = document.getElementById('search-q');
@@ -1359,47 +1485,55 @@ document.addEventListener('keydown', (e)=>{
 
   /* ------- Autoload ------- */
   async function autoLoad(){
-    log('Autoload…','info');
-    if(location.protocol==='file:') log('Aperto via file:// – usa il server Flask per salvataggi automatici.','warn');
+  log('Autoload…','info');
+  if(location.protocol==='file:') log('Aperto via file:// – usa il server Flask per salvataggi automatici.','warn');
 
-    try{
-      const cfg=await getTextFromServer('config.ini');
-      if(cfg){
-        const ini=parseIni(cfg);
-        if(ini['Anno']?.['year']) $('#year').value=ini['Anno']['year'];
-        if(ini['Team']?.['names']) $('#names').value=ini['Team']['names'];
-        if(ini['Linac']?.['options']) $('#options').value=ini['Linac']['options'];
-      }
-      if(!$('#year').value){
-        const cfgTxt = await getTextFromServer('config.ini');
-        if(cfgTxt){
-          const y = parseYearFromConfigTxt(cfgTxt);
-          if(y){ $('#year').value = y; log('Anno letto da config.ini: '+y,'ok'); }
-        }
-      }
-      state.year=parseInt($('#year').value || (new Date().getFullYear()+1),10);
-      state.names=($('#names').value||'').split(',').map(s=>s.trim()).filter(Boolean);
-      state.options=($('#options').value||'').split(',').map(s=>s.trim()).filter(Boolean);
-      const dl=$('#options-list'); dl.innerHTML=''; state.options.forEach(v=>{ const o=document.createElement('option'); o.value=v.trim(); dl.appendChild(o); });
+  try{
+    const yearEl = $('#year');
+    const namesEl = $('#names');
+    const optsEl  = $('#options');
 
-      await loadHolidaysFromLocalOrWeb();
-
-      const selName = selectionsFileName();
-      const selTxt = await getTextFromServer(selName);
-      if(selTxt){ importSelectionsFromText(selTxt); log('Caricato '+selName,'ok'); }
-		else { log('Nessun selections trovato su server: '+selName,'warn'); }
-  
-      save.selName = selName;
-      save.logName = 'planny_log_'+state.year+'.txt';
-
-      try { await appendLogsToServer({force:true}); } catch(e){ log('Impossibile creare/aggiornare il log: '+e.message,'warn'); }
-
-      renderAndJumpToToday();
-
-    }catch(e){
-      log('Errore in autoload: '+e.message,'err');
+    // 1) leggi config.ini (se presente)
+    const cfgTxt = await getTextFromServer('config.ini').catch(()=> '');
+    let iniYear = null, iniNames = '', iniOpts = '';
+    if (cfgTxt){
+      const ini = parseIni(cfgTxt);
+      iniYear  = ini['Anno']?.['year'] ? parseInt(ini['Anno']['year'],10) : (parseYearFromConfigTxt(cfgTxt)||null);
+      iniNames = ini['Team']?.['names']    || '';
+      iniOpts  = ini['Linac']?.['options'] || '';
+      if (yearEl)  yearEl.value  = iniYear || '';
+      if (namesEl) namesEl.value = iniNames;
+      if (optsEl)  optsEl.value  = iniOpts;
     }
+
+    // 2) imposta lo stato (senza assumere esistenza degli input)
+    state.year    = iniYear ?? (yearEl?.value ? parseInt(yearEl.value,10) : (new Date().getFullYear()+1));
+    state.names   = (namesEl?.value || iniNames || '').split(',').map(s=>s.trim()).filter(Boolean);
+    state.options = (optsEl?.value  || iniOpts  || '').split(',').map(s=>s.trim()).filter(Boolean);
+
+    // 3) popola datalist opzioni
+    const dl = $('#options-list'); 
+    if (dl){ dl.innerHTML=''; state.options.forEach(v=>{ const o=document.createElement('option'); o.value=v.trim(); dl.appendChild(o); }); }
+
+    // 4) prosegui come prima
+    await loadHolidaysFromLocalOrWeb();
+
+    const selName = selectionsFileName();
+    const selTxt = await getTextFromServer(selName).catch(()=> '');
+    if(selTxt){ importSelectionsFromText(selTxt); log('Caricato '+selName,'ok'); }
+    else { log('Nessun selections trovato su server: '+selName,'warn'); }
+
+    save.selName = selName;
+    save.logName = 'planny_log_'+state.year+'.txt';
+
+    try { await appendLogsToServer(); } catch(e){ log('Impossibile creare/aggiornare il log: '+e.message,'warn'); }
+
+    renderAndJumpToToday();
+
+  }catch(e){
+    log('Errore in autoload: '+e.message,'err');
   }
+}
 
 
   document.getElementById('jump-today').addEventListener('click', jumpToToday);
@@ -1644,8 +1778,7 @@ async function guardedFetch(url, opts){
   }
   return res;
 }
-</script>
-<script>
+
 // barra login/logout
 async function refreshAuthBar(){
   try {
@@ -1700,6 +1833,43 @@ window.addEventListener('DOMContentLoaded', ()=>{
   refreshAuthBar();
 });
 </script>
+<script>
+(function fixTopbar(){
+  // 1) Assicurati che .topbar-grid esista (se non c'è, creala)
+  let grid = document.querySelector('.topbar-grid');
+  if (!grid) {
+    grid = document.createElement('div');
+    grid.className = 'topbar-grid';
+    grid.innerHTML = `
+      <div class="topbar-left"></div>
+      <div class="topbar-center"></div>
+      <div class="topbar-right"></div>
+    `;
+    // Inserisci la topbar in cima al contenitore principale
+    (document.querySelector('.wrap') || document.body).insertBefore(grid, (document.querySelector('.wrap') || document.body).firstChild);
+  }
+
+  const left   = grid.querySelector('.topbar-left');
+  const center = grid.querySelector('.topbar-center');
+  const right  = grid.querySelector('.topbar-right');
+
+  // 2) Sposta i tre blocchi DENTRO la griglia
+  const yearBox  = document.getElementById('cloud-year-box');
+  if (yearBox && yearBox.parentElement !== left) left.appendChild(yearBox);
+
+  const authBar  = document.getElementById('auth-bar');
+  if (authBar && authBar.parentElement !== center) center.appendChild(authBar);
+
+  const saveBadge = document.querySelector('#save-status, .badge-saved, .status-badge, .save-status');
+  if (saveBadge && saveBadge.parentElement !== right) right.appendChild(saveBadge);
+
+  // 3) (solo se prima il login veniva spostato nella .tabsbar) disattiva quel vecchio script
+  // altrimenti lui lo rimette giù tra i mesi.
+})();
+</script>
+
+
+<script src="export_year.js" defer></script>
 
 </body>
 </html>
