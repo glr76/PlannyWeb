@@ -1056,7 +1056,6 @@
 18-10-2025,Raffaele,CAM4930
 20-10-2025,Alfredo,Assente
 20-10-2025,Fabio,UM9243
-20-10-2025,Fabrizio,Ferie
 20-10-2025,Lorenzo,OS7283
 20-10-2025,Michelangelo,CH3556
 21-10-2025,Alfredo,Assente
@@ -1068,6 +1067,7 @@
 21-10-2025,Raffaele,A.D.R. RAD
 22-10-2025,Alfredo,Assente
 22-10-2025,Fabio,UM9243
+22-10-2025,Fabrizio,Ferie
 22-10-2025,Gabriele,TN4107
 22-10-2025,Lorenzo,PT3011
 22-10-2025,Michelangelo,UNITY
