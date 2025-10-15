@@ -125,10 +125,24 @@ th.datecol, td.datecol {width:100px; min-width:100px; max-width:100px;}
 td, th {padding: 2px 4px;}
 #calendar-container {margin-left:0;margin-right:0;padding-left:4px;padding-right:4px;max-width:100%;}
 #calendar {margin-left:0;margin-right:0;}
+#auth-bar{
+  display:flex;
+  justify-content:center;   /* centrata */
+  align-items:center;
+  gap:.5rem;
+  padding:.6rem 1rem;
+  border-bottom:1px solid #ddd;
+  background:var(--panel);
+  position:sticky;
+  top:0;
+  width:100%;
+  z-index:100;
+  margin-bottom:8px;
+}
+
 </style>
 
 </head>
-<body>
 <body>
   <div id="auth-bar">
     <span id="auth-status">👤 ospite</span>
@@ -139,8 +153,6 @@ td, th {padding: 2px 4px;}
   <div class="wrap">
     ...
   </div>
-</body>
-
 <div class="wrap">
 
   <div class="card" style="margin-top:10px">
