@@ -126,40 +126,21 @@ td, th {padding: 2px 4px;}
 #calendar-container {margin-left:0;margin-right:0;padding-left:4px;padding-right:4px;max-width:100%;}
 #calendar {margin-left:0;margin-right:0;}
 </style>
-<style>
-  /* Barra superiore in griglia: sinistra | centro | destra */
-  .topbar-grid{
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    column-gap: 12px;
-    padding: 6px 12px;
-    margin-bottom: 8px;
-  }
-  .topbar-left  { justify-self: start; }
-  .topbar-center{ justify-self: center; }
-  .topbar-right { justify-self: end; display:flex; align-items:center; gap:8px; }
-
-  /* Allineamenti/cleanup dei blocchi spostati */
-  #cloud-year-box{ display:flex; gap:8px; align-items:center; }
-  #auth-bar{ display:flex; gap:.5rem; align-items:center; padding:0 !important; margin:0 !important; border:0 !important; background:transparent !important; }
-
-  /* IMPORTANTISSIMO: quando il badge "Tutto salvato" è nella topbar, NON deve essere assoluto/fixed */
-  .topbar-right #save-status{
-    position: static !important;
-    right: auto !important; top: auto !important; left:auto !important; bottom:auto !important;
-    margin: 0 !important;
-  }
-
-  /* Mobile: impila le 3 aree una sotto l'altra */
-  @media (max-width: 720px){
-    .topbar-grid{ grid-template-columns: 1fr; row-gap: 6px; }
-    .topbar-left,.topbar-center,.topbar-right{ justify-self: center; text-align: center; }
-  }
-</style>
 
 </head>
 <body>
+<body>
+  <div id="auth-bar">
+    <span id="auth-status">👤 ospite</span>
+    <button id="btn-login">Login</button>
+    <button id="btn-logout" style="display:none">Logout</button>
+  </div>
+
+  <div class="wrap">
+    ...
+  </div>
+</body>
+
 <div class="wrap">
   
 <div id="auth-bar" style="display:flex;gap:.5rem;align-items:center;justify-content:flex-end;padding:.5rem 1rem;border-bottom:1px solid #eee;margin-bottom:8px">
@@ -1844,14 +1825,10 @@ window.addEventListener('DOMContentLoaded', ()=>{
 });
 </script>
 <script>
-(function setupTopbar(){
-  // contenitore principale (adatta se usi un wrapper diverso)
-  const wrap = document.querySelector('.wrap') || document.body;
-  if(!wrap) return;
-
-  // se la topbar esiste già non ricrearla
+(function fixTopbar(){
+  // 1) Assicurati che .topbar-grid esista (se non c'è, creala)
   let grid = document.querySelector('.topbar-grid');
-  if(!grid){
+  if (!grid) {
     grid = document.createElement('div');
     grid.className = 'topbar-grid';
     grid.innerHTML = `
@@ -1859,29 +1836,29 @@ window.addEventListener('DOMContentLoaded', ()=>{
       <div class="topbar-center"></div>
       <div class="topbar-right"></div>
     `;
-    wrap.insertBefore(grid, wrap.firstChild);
+    // Inserisci la topbar in cima al contenitore principale
+    (document.querySelector('.wrap') || document.body).insertBefore(grid, (document.querySelector('.wrap') || document.body).firstChild);
   }
 
   const left   = grid.querySelector('.topbar-left');
   const center = grid.querySelector('.topbar-center');
   const right  = grid.querySelector('.topbar-right');
 
-  // 1) Sinistra: Anno + filename
-  const yearBox = document.getElementById('cloud-year-box');
+  // 2) Sposta i tre blocchi DENTRO la griglia
+  const yearBox  = document.getElementById('cloud-year-box');
   if (yearBox && yearBox.parentElement !== left) left.appendChild(yearBox);
 
-  // 2) Centro: login/logout
-  const authBar = document.getElementById('auth-bar');
+  const authBar  = document.getElementById('auth-bar');
   if (authBar && authBar.parentElement !== center) center.appendChild(authBar);
 
-  // 3) Destra: badge "Tutto salvato"
-  // prova questi selettori; il tuo dovrebbe essere #save-status
-  const saveBadge = document.querySelector('#save-status, .badge-saved, .status-badge');
+  const saveBadge = document.querySelector('#save-status, .badge-saved, .status-badge, .save-status');
   if (saveBadge && saveBadge.parentElement !== right) right.appendChild(saveBadge);
 
-  // se avevi uno script che spostava #auth-bar nella .tabsbar, commentalo/rimuovilo
+  // 3) (solo se prima il login veniva spostato nella .tabsbar) disattiva quel vecchio script
+  // altrimenti lui lo rimette giù tra i mesi.
 })();
 </script>
+
 
 <script src="export_year.js" defer></script>
 
