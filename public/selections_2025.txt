@@ -1056,7 +1056,7 @@
 18-10-2025,Raffaele,CAM4930
 20-10-2025,Alfredo,Assente
 20-10-2025,Fabio,UM9243
-20-10-2025,Gabriele,Ferie
+20-10-2025,Fabrizio,Ferie
 20-10-2025,Lorenzo,OS7283
 20-10-2025,Michelangelo,CH3556
 21-10-2025,Alfredo,Assente
