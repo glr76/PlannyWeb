@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Planny HTML</title>
 <style id="addon-terminal-minheight-v3">
-  .card:first-of-type { display: none !important; }
   #terminal, .terminal, #console, .console, #log, .log {
     height: 140px !important;
     max-height: 140px !important;
@@ -126,18 +125,14 @@ td, th {padding: 2px 4px;}
 #calendar-container {margin-left:0;margin-right:0;padding-left:4px;padding-right:4px;max-width:100%;}
 #calendar {margin-left:0;margin-right:0;}
 #auth-bar{
-  display:flex;
-  justify-content:center;   /* centrata */
-  align-items:center;
-  gap:.5rem;
-  padding:.6rem 1rem;
-  border-bottom:1px solid #ddd;
-  background:var(--panel);
-  position:sticky;
-  top:0;
-  width:100%;
-  z-index:100;
-  margin-bottom:8px;
+  display:flex; justify-content:center; align-items:center; gap:.5rem;
+  padding:.6rem 1rem; border-bottom:1px solid #ddd; background:var(--panel);
+  position:sticky; top:0; width:100%; z-index:100;
+}
+#cloud-year-box{
+  display:flex; justify-content:center; align-items:center; gap:.5rem;
+  padding:.6rem 1rem; border-bottom:1px solid #ddd; background:var(--panel);
+  position:sticky; top:48px; width:100%; z-index:90;
 }
 
 </style>
@@ -150,34 +145,42 @@ td, th {padding: 2px 4px;}
     <button id="btn-logout" style="display:none">Logout</button>
   </div>
 
-<div class="wrap">
+  <!-- 🔹 Barra ANNO (STATICA) -->
+  <div id="cloud-year-box" class="bar" style="justify-content:center; gap:.5rem; margin-top:8px">
+    <label for="cloud-year-select">Anno</label>
+    <select id="cloud-year-select"></select>
+    <button id="btn-cloud-prev" class="btn mini">◀</button>
+    <button id="btn-cloud-next" class="btn mini">▶</button>
+    <span id="cloud-status" style="font-size:.9em; opacity:.8;">Pronto</span>
+  </div>
 
-  <div class="card" style="margin-top:10px">
-    <div class="tabsbar">
-      <div class="tabs" id="tabs"></div>
-      <div class="bar-right">
-        <div class="searchbox">
-          <input id="search-q" type="text" placeholder="Cerca impegno…" />
-          <button id="search-prev" class="btn mini" title="Precedente">Prev</button>
-          <button id="search-next" class="btn mini" title="Successivo">Next</button>
-		  <div id="search-count" class="search-count">0/0</div>
+  <!-- 🔹 Contenuto principale -->
+  <div class="wrap">
+    <div class="card" style="margin-top:10px">
+      <div class="tabsbar">
+        <div class="tabs" id="tabs"></div>
+        <div class="bar-right">
+          <div class="searchbox">
+            <input id="search-q" type="text" placeholder="Cerca impegno…"/>
+            <button id="search-prev" class="btn mini" title="Precedente">Prev</button>
+            <button id="search-next" class="btn mini" title="Successivo">Next</button>
+            <div id="search-count" class="search-count">0/0</div>
+          </div>
+          <button id="jump-today" class="btn mini" title="Vai a oggi">Oggi</button>
+          <button id="btn-export-year" class="btn mini" title="Scarica selections e log dell'anno">Download</button>
         </div>
-        <button id="jump-today" class="btn mini" title="Vai a oggi">Oggi</button>
-		<button id="btn-export-year" class="btn mini" title="Scarica selections e log dell'anno">Download</button>
+      </div>
+      <div id="month" class="month">
+        <table id="calendar">
+          <thead id="thead"></thead>
+        </table>
       </div>
     </div>
-    <div id="month" class="month">
-      <table id="calendar">
-        <thead id="thead"></thead>
-      </table>
-    </div>
-  </div>
 
-  <div class="card" style="margin-top:10px">
-    <h2 style="margin:0 0 8px;font-size:14px;color:#9bb0c9">Terminale</h2>
-    <div id="terminal" class="terminal" aria-live="polite" aria-atomic="false"></div>
-  </div>
-</div>
+    <div class="card" style="margin-top:10px">
+      <h2 style="margin:0 0 8px;font-size:14px;color:#9bb0c9">Terminale</h2>
+      <div id="terminal" class="terminal" aria-live="polite" aria-atomic="false"></div>
+    </div>
 
 <!-- Context menu -->
 <div id="ctx" class="ctx" role="menu" aria-hidden="true">
