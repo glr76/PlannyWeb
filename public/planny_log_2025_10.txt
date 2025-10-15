@@ -1,2 +1,3 @@
 [8:04:27 AM] MOVE 20-10-2025, Fabrizio,Ferie → 20-10-2025, Gabriele
 [8:04:36 AM] MOVE 20-10-2025, Gabriele,Ferie → 20-10-2025, Fabrizio
+[8:04:43 AM] MOVE 20-10-2025, Fabrizio,Ferie → 22-10-2025, Fabrizio
