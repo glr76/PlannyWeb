@@ -5,3 +5,4 @@
 [9:37:49 AM] MOVE 22-10-2025, Lorenzo,PT3011 → 22-10-2025, Fabrizio
 [9:37:55 AM] MOVE 22-10-2025, Fabrizio,PT3011 → 22-10-2025, Lorenzo
 [11:25:05 AM] MOVE 16-10-2025, Fabrizio,Ferie → 16-10-2025, Lorenzo
+[11:25:10 AM] MOVE 16-10-2025, Lorenzo,Ferie → 16-10-2025, Fabrizio
