@@ -1068,8 +1068,8 @@
 21-10-2025,Raffaele,A.D.R. RAD
 22-10-2025,Alfredo,Assente
 22-10-2025,Fabio,UM9243
+22-10-2025,Fabrizio,PT3011
 22-10-2025,Gabriele,TN4107
-22-10-2025,Lorenzo,PT3011
 22-10-2025,Michelangelo,UNITY
 22-10-2025,Raffaele,UNITY
 23-10-2025,Alfredo,Assente
