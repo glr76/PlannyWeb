@@ -43,7 +43,37 @@ td, th {padding: 2px 4px;}
   .hint{font-size:12px;color:var(--muted)}
 
   .tabsbar{display:flex;align-items:center;gap:12px;justify-content:space-between;margin-top:6px}
-  .tabs{display:flex;gap:6px;flex-wrap:wrap}
+  /* Tutti i mesi su una riga orizzontale */
+.tabs {
+  display: flex;
+  flex-wrap: nowrap;                /* non andare mai a capo */
+  justify-content: space-between;   /* distribuisce i bottoni lungo la riga */
+  gap: 4px;
+  overflow: hidden;                 /* nessuno scroll visibile */
+}
+
+.tab {
+  flex: 1 1 auto;                   /* i bottoni si ridimensionano per entrare tutti */
+  text-align: center;
+  padding: 8px 0;                   /* riduce altezza per schermi piccoli */
+  min-width: 0;                     /* permette di comprimere i bottoni */
+}
+
+/* Mantieni lo stile per il mese attivo */
+.tab.active {
+  background: var(--accent);
+  color: #07121f;
+  border-color: transparent;
+}
+
+/* Responsive: su schermi stretti i bottoni diventano più piccoli */
+@media (max-width: 768px) {
+  .tab {
+    font-size: 12px;
+    padding: 6px 0;
+  }
+}
+
   .tab{padding:8px 10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);cursor:pointer;font-weight:600;color:#5b6877}
   .tab.active{background:var(--accent);color:#07121f;border-color:transparent}
   .bar-right{display:flex;gap:8px;align-items:center}
