@@ -19,3 +19,5 @@
 [7:36:54 AM] MOVE 22-10-2025, Fabrizio,PT3011 → 22-10-2025, Lorenzo
 [7:38:13 AM] DELETE 16-10-2025, Giuseppe,prova
 [7:38:13 AM] Celle cancellate.
+[7:38:16 AM] DELETE 16-10-2025, Lorenzo,pippo
+[7:38:16 AM] Celle cancellate.
