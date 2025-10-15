@@ -364,9 +364,6 @@ async function appendLogsToServer(opts={force:false}){
   const name = `planny_log_${year}.txt`;
 
   let chunk = logsChunkSinceCursor();
-  if (!chunk && opts.force){
-    chunk = `[${new Date().toLocaleString()}] Sessione avviata su ${location.href}\n`;
-  }
   if (!chunk) return;
 
   const taskId = `log:${name}:${Date.now()}`;
@@ -858,7 +855,7 @@ function makeCell(date,name){
       save.logName = 'planny_log_'+state.year+'.txt';
       loadHolidaysFromLocalOrWeb().then(()=>{
         renderAndJumpToToday();
-        appendLogsToServer({force:true});
+        appendLogsToServer();
       });
     }catch(e){
       log('Errore reconfigureAfterYearChange: '+(e.message||e),'warn');
@@ -1432,7 +1429,7 @@ function hideCtx(){
     save.selName = selName;
     save.logName = 'planny_log_'+state.year+'.txt';
 
-    try { await appendLogsToServer({force:true}); } catch(e){ log('Impossibile creare/aggiornare il log: '+e.message,'warn'); }
+    try { await appendLogsToServer(); } catch(e){ log('Impossibile creare/aggiornare il log: '+e.message,'warn'); }
 
     renderAndJumpToToday();
 
