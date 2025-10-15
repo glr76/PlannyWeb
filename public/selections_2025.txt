@@ -1080,6 +1080,8 @@
 23-10-2025,Raffaele,UNITY
 24-10-2025,Alfredo,Assente
 24-10-2025,Giuseppe,EM4416
+25-10-2025,Giuseppe,CAM4930
+25-10-2025,Lorenzo,CAM4930
 25-10-2025,Raffaele,CAM4930
 27-10-2025,Alfredo,Assente
 27-10-2025,Gabriele,PG6749
