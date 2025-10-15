@@ -363,6 +363,21 @@ td, th {padding: 2px 4px;}
 </div>
 
 <datalist id="options-list"></datalist>
+<script>
+  // shim di sicurezza se non esistono già
+  window.hideCtx = window.hideCtx || function(){
+    const ctx = document.getElementById('ctx');
+    if (ctx) ctx.style.display = 'none';
+  };
+  window.showCtx = window.showCtx || function(x,y){
+    const ctx = document.getElementById('ctx');
+    if (!ctx) return;
+    ctx.style.position = 'fixed';
+    ctx.style.left = x + 'px';
+    ctx.style.top  = y + 'px';
+    ctx.style.display = 'block';
+  };
+</script>
 
 <script>
 (function(){
@@ -2154,7 +2169,7 @@ window.addEventListener('DOMContentLoaded', ()=>{
 })();
 </script>
 
-<script src="upload_public.js"></script>
+<script src="upload.js"></script>
 <script src="export_year.js" defer></script>
 
 </body>
