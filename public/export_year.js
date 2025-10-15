@@ -1,12 +1,9 @@
 // export_year.js
-// Scarica selections_<ANNO>.txt e planny_log_<ANNO>.txt al click del bottone #btn-export-year
-
 console.log('[export] script loaded');
 
 (function(){
   function logOK(...a){ try{ console.log('[export]', ...a); }catch(_){} }
   function logWarn(...a){ try{ console.warn('[export]', ...a); }catch(_){} }
-  function logErr(...a){ try{ console.error('[export]', ...a); }catch(_){} }
 
   // Scarica testo come file locale
   function downloadTextFile(filename, text) {
@@ -22,7 +19,7 @@ console.log('[export] script loaded');
     logOK('downloaded', filename);
   }
 
-  // Legge testo dal backend; usa l’helper dell’app se disponibile
+  // Leggi dal backend; preferisci l’helper dell’app se c’è
   async function getText(filename){
     if (typeof window.getTextFromServer === 'function') {
       return await window.getTextFromServer(filename);
@@ -50,36 +47,27 @@ console.log('[export] script loaded');
   }
 
   async function exportYearFiles(btn){
-    const year = (window.state && window.state.year) || new Date().getFullYear();
-    const selectionsName = `selections_${year}.txt`;
-    const logName        = `planny_log_${year}.txt`;
+    const y  = (window.state && window.state.year) || new Date().getFullYear();
+    const mm = String((new Date()).getMonth() + 1).padStart(2,'0');
+    const selectionsName = `selections_${y}.txt`;
+    const logName        = `planny_log_${y}_${mm}.txt`; // LOG MENSILE
 
-    const originalLabel = btn?.textContent || 'Download';
+    const original = btn?.textContent || 'Download';
     try{
       if (btn){ btn.disabled = true; btn.textContent = 'Esporto…'; }
-      logOK('start', { year, selectionsName, logName });
-
+      logOK('start', { y, selectionsName, logName });
       const okSel = await fetchAndDownload(selectionsName);
       const okLog = await fetchAndDownload(logName);
-
-      if (!okSel && !okLog){
-        logWarn('Nessun file esportato (entrambi mancanti?)');
-      }else{
-        logOK('Export completato');
-      }
-    }finally{
-      if (btn){ btn.disabled = false; btn.textContent = originalLabel; }
+      if (!okSel && !okLog) logWarn('Nessun file esportato (entrambi mancanti?)');
+    } finally {
+      if (btn){ btn.disabled = false; btn.textContent = original; }
     }
   }
 
-  // Collega il click quando il DOM è pronto
+  // ✅ Collega il bottone ESISTENTE quando il DOM è pronto
   function wire(){
     const btn = document.getElementById('btn-export-year');
-    if (!btn){
-      logWarn('pulsante con id="btn-export-year" non trovato (ritento)…');
-      setTimeout(wire, 150);
-      return;
-    }
+    if (!btn){ setTimeout(wire, 150); return; }
     if (!btn.__wired){
       btn.addEventListener('click', ()=> exportYearFiles(btn));
       btn.__wired = true;
@@ -87,7 +75,7 @@ console.log('[export] script loaded');
     }
   }
 
-  if (document.readyState === 'loading'){
+  if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', wire);
   } else {
     wire();
