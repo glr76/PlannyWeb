@@ -22,3 +22,4 @@
 [7:38:16 AM] DELETE 16-10-2025, Lorenzo,pippo
 [7:38:16 AM] Celle cancellate.
 [7:46:57 AM] MOVE 16-10-2025, Fabrizio,Ferie → 16-10-2025, Lorenzo
+[7:47:03 AM] MOVE 16-10-2025, Lorenzo,Ferie → 16-10-2025, Fabrizio
