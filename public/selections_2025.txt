@@ -1053,10 +1053,10 @@
 17-10-2025,Gabriele,TS1
 17-10-2025,Lorenzo,AR7289
 17-10-2025,Raffaele,LA6007
-18-10-2025,Raffaele,CAM4930
 20-10-2025,Alfredo,Assente
 20-10-2025,Fabio,UM9243
 20-10-2025,Fabrizio,Ferie
+20-10-2025,Giuseppe,ARPAIA
 20-10-2025,Lorenzo,OS7283
 20-10-2025,Michelangelo,CH3556
 21-10-2025,Alfredo,Assente
@@ -1080,6 +1080,7 @@
 23-10-2025,Raffaele,UNITY
 24-10-2025,Alfredo,Assente
 24-10-2025,Giuseppe,EM4416
+25-10-2025,Raffaele,CAM4930
 27-10-2025,Alfredo,Assente
 27-10-2025,Gabriele,PG6749
 27-10-2025,Giuseppe,Grosseto VeriQA
@@ -1110,7 +1111,6 @@
 05-11-2025,Lorenzo,SP6706
 06-11-2025,Gabriele,VI9189
 06-11-2025,Raffaele,PI3412
-07-11-2025,Fabrizio,CAR6391
 07-11-2025,Giuseppe,CRI Seq
 07-11-2025,Raffaele,PTV9168
 10-11-2025,Fabio,TS1
@@ -1125,6 +1125,7 @@
 12-11-2025,Michelangelo,Training
 12-11-2025,Raffaele,PTV9174
 13-11-2025,Fabio,TS1
+13-11-2025,Gabriele,A.D.R
 13-11-2025,Giuseppe,Gamma
 13-11-2025,Michelangelo,Training
 14-11-2025,Fabio,TS1
@@ -1139,6 +1140,7 @@
 19-11-2025,Raffaele,SO7103
 21-11-2025,Giuseppe,EM4416
 21-11-2025,Raffaele,UM9242
+24-11-2025,Fabrizio,CAR6391
 24-11-2025,Raffaele,AQ2465
 25-11-2025,Gabriele,GR4044
 25-11-2025,Raffaele,AQ6943
