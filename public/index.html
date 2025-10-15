@@ -1595,43 +1595,69 @@ function hideCtx(){
   }
 
   function installYearSelector(years){
-    if (document.getElementById('cloud-year-select')) return;
+  // 1) individua elementi esistenti (statici) oppure prepara host per crearli
+  let box   = document.getElementById('cloud-year-box');
+  let sel   = document.getElementById('cloud-year-select');
+  let badge = document.getElementById('cloud-year-badge') || document.getElementById('cloud-status');
+
+  if (!sel){
+    // crea markup SOLO se non esiste
     let host = document.querySelector('#toolbar, .toolbar, header, .topbar, .controls');
     if (!host) host = document.body.firstElementChild || document.body;
 
-    const box = document.createElement('div');
+    box = box || document.createElement('div');
     box.id = 'cloud-year-box';
+
     const label = document.createElement('label');
     label.textContent = 'Anno';
     label.htmlFor = 'cloud-year-select';
-    const sel = document.createElement('select');
+
+    sel = document.createElement('select');
     sel.id = 'cloud-year-select';
-    const badge = document.createElement('span');
-    badge.id = 'cloud-year-badge';
+
+    badge = badge || document.createElement('span');
+    if (!badge.id) badge.id = 'cloud-year-badge';
     badge.style.marginLeft = '6px';
 
-    box.appendChild(label); box.appendChild(sel); box.appendChild(badge);
+    box.appendChild(label);
+    box.appendChild(sel);
+    box.appendChild(badge);
     host.insertBefore(box, host.firstChild);
+  }
 
-    const now = new Date().getFullYear();
-    const list = (years && years.length ? years : [now-1, now, now+1, now+2]);
-    sel.innerHTML = list.map(y=>`<option value="${y}">${y}</option>`).join('');
+  // 2) popola la tendina se vuota
+  const now  = new Date().getFullYear();
+  const list = (years && years.length ? years : [now-1, now, now+1, now+2]);
+  if (sel.options.length === 0){
+    sel.innerHTML = list.map(y => `<option value="${y}">${y}</option>`).join('');
+  }
 
-    const saved = localStorage.getItem('plannyYear');
-    const target = (saved && list.includes(+saved)) ? +saved :
-                   (window.state && window.state.year && list.includes(+window.state.year) ? +window.state.year : now);
-    sel.value = String(target);
-    localStorage.setItem('plannyYear', sel.value);
-    window.state = window.state || {}; window.state.year = +sel.value;
-    badge.textContent = fname(sel.value);
+  // 3) allinea valore iniziale (localStorage → state → now)
+  const saved  = localStorage.getItem('plannyYear');
+  const target = (saved && list.includes(+saved)) ? +saved
+                : (window.state && window.state.year && list.includes(+window.state.year) ? +window.state.year
+                : now);
+  sel.value = String(target);
+  localStorage.setItem('plannyYear', sel.value);
+  window.state = window.state || {};
+  window.state.year = +sel.value;
 
+  // 4) badge/status
+  const setBadge = y => { if (badge) badge.textContent = `selections_${String(y).trim()}.txt`; };
+  setBadge(sel.value);
+
+  // 5) listener cambio anno
+  if (!sel.__wired){
     sel.addEventListener('change', async () => {
       window.state.year = +sel.value;
       localStorage.setItem('plannyYear', sel.value);
-      badge.textContent = fname(sel.value);
-      await reloadSelectionsFromCloud();
+      setBadge(sel.value);
+      await reloadSelectionsFromCloud?.();
     });
+    sel.__wired = true;
   }
+}
+
 
   window.saveSelectionsToCloud = async function(){
     const y = window.state?.year || new Date().getFullYear();
