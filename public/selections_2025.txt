@@ -1079,6 +1079,7 @@
 23-10-2025,Michelangelo,UNITY
 23-10-2025,Raffaele,UNITY
 24-10-2025,Alfredo,Assente
+24-10-2025,Fabrizio,dddd
 25-10-2025,Raffaele,CAM4930
 27-10-2025,Alfredo,Assente
 27-10-2025,Gabriele,PG6749
