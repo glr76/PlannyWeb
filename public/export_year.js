@@ -1,15 +1,18 @@
 // export_year.js
+// Scarica i log mensili: mese attuale + mese precedente (solo se esistono)
+
 console.log('[export] script loaded');
 
-(function(){
-  function logOK(...a){ try{ console.log('[export]', ...a); }catch(_){} }
-  function logWarn(...a){ try{ console.warn('[export]', ...a); }catch(_){} }
+(function () {
+  // --- util log ---
+  const logOK   = (...a) => { try { console.log('[export]', ...a); } catch(_) {} };
+  const logWarn = (...a) => { try { console.warn('[export]', ...a); } catch(_) {} };
 
-  // Scarica testo come file locale
+  // --- helper: scarica testo come file locale ---
   function downloadTextFile(filename, text) {
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
     a.href = url;
     a.download = filename;
     document.body.appendChild(a);
@@ -19,8 +22,8 @@ console.log('[export] script loaded');
     logOK('downloaded', filename);
   }
 
-  // Leggi dal backend; preferisci l’helper dell’app se c’è
-  async function getText(filename){
+  // --- helper: leggi testo dal backend (preferisci helper app se presente) ---
+  async function getText(filename) {
     if (typeof window.getTextFromServer === 'function') {
       return await window.getTextFromServer(filename);
     }
@@ -31,53 +34,65 @@ console.log('[export] script loaded');
         'Pragma': 'no-cache'
       }
     });
-    if (!res.ok) throw new Error('HTTP '+res.status);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     return res.text();
   }
 
-  async function fetchAndDownload(filename){
-    try{
-      const txt = await getText(filename);
-      downloadTextFile(filename, txt);
+  // --- helper: mese precedente rispetto a "base" ---
+  function prevMonthTuple(base = new Date()) {
+    const d = new Date(base.getFullYear(), base.getMonth(), 1);
+    d.setMonth(d.getMonth() - 1);
+    return { y: d.getFullYear(), m: d.getMonth() + 1 }; // m: 1..12
+  }
+
+  // --- tenta download; se il file non esiste, silenzio (ritorna true/false) ---
+  async function fetchAndMaybeDownload(name) {
+    try {
+      const txt = await getText(name);
+      downloadTextFile(name, txt);
       return true;
-    }catch(e){
-      logWarn('missing or error', filename, e && e.message || e);
+    } catch (_) {
+      // file assente o errore → ignora senza rumore
+      logWarn('not found (skipped):', name);
       return false;
     }
   }
 
-  async function exportYearFiles(btn){
-  const y  = (window.state && window.state.year) || new Date().getFullYear();
-  const months = Array.from({length: 12}, (_, i) => String(i+1).padStart(2, '0'));
+  // === ENTRYPOINT: scarica SOLO mese attuale + precedente (se esistono) ===
+  async function exportYearFiles(btn) {
+    const today = new Date();
+    const curY  = (window.state && window.state.year) || today.getFullYear();
+    const curM  = today.getMonth() + 1;
+    const { y: prevY, m: prevM } = prevMonthTuple(today);
+	await fetchAndMaybeDownload(`selections_${curY}.txt`);
+    const files = [
+      `planny_log_${curY}_${String(curM).padStart(2, '0')}.txt`,
+      `planny_log_${prevY}_${String(prevM).padStart(2, '0')}.txt`,
+    ];
 
-  const original = btn?.textContent || 'Download';
-  try{
-    if (btn){ btn.disabled = true; btn.textContent = 'Esporto…'; }
-    console.log('[export] start - year', y);
+    const original = btn?.textContent || 'Download';
+    try {
+      if (btn) { btn.disabled = true; btn.textContent = 'Scarico…'; }
+      logOK('start', { current: files[0], previous: files[1] });
 
-    // (opzionale) scarica anche le selections dell’anno
-    const selectionsName = `selections_${y}.txt`;
-    await fetchAndDownload(selectionsName);
+      const results = await Promise.allSettled(files.map(fetchAndMaybeDownload));
+      const ok = results.filter(r => r.status === 'fulfilled' && r.value === true).length;
 
-    // scarica tutti i log mensili esistenti dell’anno
-    for (const mm of months){
-      const logName = `planny_log_${y}_${mm}.txt`;
-      await fetchAndDownload(logName); // se non esiste, viene solo loggato un warning
+      // feedback nel Terminale interno (se disponibile)
+      if (typeof window.log === 'function') {
+        window.log(`Scaricati ${ok}/${files.length} log (attuale + precedente)`, 'cell');
+      }
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = original; }
     }
-
-    console.log('[export] done - all monthly logs tried for', y);
-  } finally {
-    if (btn){ btn.disabled = false; btn.textContent = original; }
   }
-}
 
-
-  // ✅ Collega il bottone ESISTENTE quando il DOM è pronto
-  function wire(){
+  // --- collega il bottone ESISTENTE (#btn-export-year) quando il DOM è pronto ---
+  function wire() {
     const btn = document.getElementById('btn-export-year');
-    if (!btn){ setTimeout(wire, 150); return; }
-    if (!btn.__wired){
-      btn.addEventListener('click', ()=> exportYearFiles(btn));
+    if (!btn) { setTimeout(wire, 150); return; }
+    if (!btn.__wired) {
+      btn.addEventListener('click', () => exportYearFiles(btn));
       btn.__wired = true;
       logOK('listener collegato al pulsante', btn);
     }
