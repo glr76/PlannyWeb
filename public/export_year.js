@@ -47,22 +47,30 @@ console.log('[export] script loaded');
   }
 
   async function exportYearFiles(btn){
-    const y  = (window.state && window.state.year) || new Date().getFullYear();
-    const mm = String((new Date()).getMonth() + 1).padStart(2,'0');
-    const selectionsName = `selections_${y}.txt`;
-    const logName        = `planny_log_${y}_${mm}.txt`; // LOG MENSILE
+  const y  = (window.state && window.state.year) || new Date().getFullYear();
+  const months = Array.from({length: 12}, (_, i) => String(i+1).padStart(2, '0'));
 
-    const original = btn?.textContent || 'Download';
-    try{
-      if (btn){ btn.disabled = true; btn.textContent = 'Esporto…'; }
-      logOK('start', { y, selectionsName, logName });
-      const okSel = await fetchAndDownload(selectionsName);
-      const okLog = await fetchAndDownload(logName);
-      if (!okSel && !okLog) logWarn('Nessun file esportato (entrambi mancanti?)');
-    } finally {
-      if (btn){ btn.disabled = false; btn.textContent = original; }
+  const original = btn?.textContent || 'Download';
+  try{
+    if (btn){ btn.disabled = true; btn.textContent = 'Esporto…'; }
+    console.log('[export] start - year', y);
+
+    // (opzionale) scarica anche le selections dell’anno
+    const selectionsName = `selections_${y}.txt`;
+    await fetchAndDownload(selectionsName);
+
+    // scarica tutti i log mensili esistenti dell’anno
+    for (const mm of months){
+      const logName = `planny_log_${y}_${mm}.txt`;
+      await fetchAndDownload(logName); // se non esiste, viene solo loggato un warning
     }
+
+    console.log('[export] done - all monthly logs tried for', y);
+  } finally {
+    if (btn){ btn.disabled = false; btn.textContent = original; }
   }
+}
+
 
   // ✅ Collega il bottone ESISTENTE quando il DOM è pronto
   function wire(){
