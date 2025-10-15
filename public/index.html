@@ -119,7 +119,7 @@ td, th {padding: 2px 4px;}
   .btn{appearance:none;border:1px solid var(--border);background:var(--surface);color:var(--text);padding:10px 12px;border-radius:10px;cursor:pointer}
   .btn.mini{padding:6px 10px;font-size:12px}
   .searchbox{display:flex;gap:6px;align-items:center}
-  .searchbox input{width:220px;padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:var(--surface)}
+  .searchbox input{width:180px;padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:var(--surface)}
   .search-count{font-size:12px;color:var(--muted);min-width:60px;text-align:center}
 
   .month{margin-top:10px;max-height:68vh;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;position:relative;scroll-snap-type:y mandatory;scroll-padding-top:48px}
@@ -337,6 +337,9 @@ td, th {padding: 2px 4px;}
           </div>
           <button id="jump-today" class="btn mini" title="Vai a oggi">Oggi</button>
           <button id="btn-export-year" class="btn mini" title="Scarica selections e log dell'anno">Download</button>
+		  <input id="upload-input" type="file" style="display:none" />
+		<button id="btn-upload-file" class="btn mini" title="Carica un file nella cartella public">Upload</button>
+
         </div>
       </div>
       <div id="month" class="month">
@@ -2151,7 +2154,7 @@ window.addEventListener('DOMContentLoaded', ()=>{
 })();
 </script>
 
-
+<script src="upload_public.js"></script>
 <script src="export_year.js" defer></script>
 
 </body>
