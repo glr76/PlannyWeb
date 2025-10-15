@@ -124,6 +124,18 @@ th.datecol, td.datecol {width:100px; min-width:100px; max-width:100px;}
 td, th {padding: 2px 4px;}
 #calendar-container {margin-left:0;margin-right:0;padding-left:4px;padding-right:4px;max-width:100%;}
 #calendar {margin-left:0;margin-right:0;}
+#calendar thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: #eef3fa;               /* o il tuo colore header */
+  box-shadow: 0 1px 0 var(--border); /* copre il pixel di separazione */
+}
+
+/* Elimina bordo doppio che causa la “riga fantasma” */
+#calendar tbody td {
+  border-top: 0;
+}
 #topbar {
   display: flex;
   justify-content: space-between;
