@@ -127,41 +127,36 @@ td, th {padding: 2px 4px;}
 #calendar {margin-left:0;margin-right:0;}
 </style>
 <style>
-  /* Barra superiore a 3 colonne */
+  /* Barra superiore in griglia: sinistra | centro | destra */
   .topbar-grid{
-    display:grid;
-    grid-template-columns: 1fr auto 1fr; /* sinistra | centro | destra */
-    align-items:center;
-    column-gap:12px;
-    padding:6px 12px;
-    margin-bottom:8px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    column-gap: 12px;
+    padding: 6px 12px;
+    margin-bottom: 8px;
   }
-  .topbar-left  { justify-self:start; }
-  .topbar-center{ justify-self:center; }
-  .topbar-right { justify-self:end; }
+  .topbar-left  { justify-self: start; }
+  .topbar-center{ justify-self: center; }
+  .topbar-right { justify-self: end; display:flex; align-items:center; gap:8px; }
 
-  /* Rende #cloud-year-box e #auth-bar allineati bene nella topbar */
-  #cloud-year-box{ display:flex; gap:6px; align-items:center; }
-  #auth-bar{
-    display:flex; gap:.5rem; align-items:center;
-    padding:0 !important; margin:0 !important; border:0 !important; background:transparent !important;
+  /* Allineamenti/cleanup dei blocchi spostati */
+  #cloud-year-box{ display:flex; gap:8px; align-items:center; }
+  #auth-bar{ display:flex; gap:.5rem; align-items:center; padding:0 !important; margin:0 !important; border:0 !important; background:transparent !important; }
+
+  /* IMPORTANTISSIMO: quando il badge "Tutto salvato" è nella topbar, NON deve essere assoluto/fixed */
+  .topbar-right #save-status{
+    position: static !important;
+    right: auto !important; top: auto !important; left:auto !important; bottom:auto !important;
+    margin: 0 !important;
   }
-  #auth-bar #btn-login, #auth-bar #btn-logout{
-    border:1px solid var(--border); background:var(--surface); color:var(--text);
-    padding:6px 10px; border-radius:10px; font-size:12px;
-  }
 
-  /* La barra con i mesi (tabs) resta com'è */
-  .tabsbar{ /* nessun absolute qui, lasciare com'è */ }
-
-  /* Mobile: impila le 3 aree */
-  @media (max-width:720px){
-    .topbar-grid{ grid-template-columns:1fr; row-gap:6px; }
-    .topbar-left,.topbar-center,.topbar-right{ justify-self:center; text-align:center; }
+  /* Mobile: impila le 3 aree una sotto l'altra */
+  @media (max-width: 720px){
+    .topbar-grid{ grid-template-columns: 1fr; row-gap: 6px; }
+    .topbar-left,.topbar-center,.topbar-right{ justify-self: center; text-align: center; }
   }
 </style>
-
-
 
 </head>
 <body>
@@ -1850,36 +1845,43 @@ window.addEventListener('DOMContentLoaded', ()=>{
 </script>
 <script>
 (function setupTopbar(){
-  // 1) Trova contenitore principale
-  const wrap = document.querySelector('.wrap');
+  // contenitore principale (adatta se usi un wrapper diverso)
+  const wrap = document.querySelector('.wrap') || document.body;
   if(!wrap) return;
 
-  // 2) Crea la topbar a 3 colonne
-  const grid = document.createElement('div');
-  grid.className = 'topbar-grid';
-  const left   = document.createElement('div'); left.className   = 'topbar-left';
-  const center = document.createElement('div'); center.className = 'topbar-center';
-  const right  = document.createElement('div'); right.className  = 'topbar-right';
-  grid.append(left, center, right);
+  // se la topbar esiste già non ricrearla
+  let grid = document.querySelector('.topbar-grid');
+  if(!grid){
+    grid = document.createElement('div');
+    grid.className = 'topbar-grid';
+    grid.innerHTML = `
+      <div class="topbar-left"></div>
+      <div class="topbar-center"></div>
+      <div class="topbar-right"></div>
+    `;
+    wrap.insertBefore(grid, wrap.firstChild);
+  }
 
-  // Inserisci la topbar in alto (prima di tutto il resto dentro .wrap)
-  wrap.insertBefore(grid, wrap.firstChild);
+  const left   = grid.querySelector('.topbar-left');
+  const center = grid.querySelector('.topbar-center');
+  const right  = grid.querySelector('.topbar-right');
 
-  // 3) Sposta dentro: a sinistra l'anno, al centro il login
+  // 1) Sinistra: Anno + filename
   const yearBox = document.getElementById('cloud-year-box');
-  if (yearBox) left.appendChild(yearBox);
+  if (yearBox && yearBox.parentElement !== left) left.appendChild(yearBox);
 
+  // 2) Centro: login/logout
   const authBar = document.getElementById('auth-bar');
-  if (authBar) center.appendChild(authBar);
+  if (authBar && authBar.parentElement !== center) center.appendChild(authBar);
 
-  // 4) (Opzionale) prova a mettere il badge "Tutto salvato" a destra se esiste già nel DOM
-  // Se il tuo badge ha un id o classe, aggiungilo qui:
+  // 3) Destra: badge "Tutto salvato"
+  // prova questi selettori; il tuo dovrebbe essere #save-status
   const saveBadge = document.querySelector('#save-status, .badge-saved, .status-badge');
-  if (saveBadge) right.appendChild(saveBadge);
+  if (saveBadge && saveBadge.parentElement !== right) right.appendChild(saveBadge);
+
+  // se avevi uno script che spostava #auth-bar nella .tabsbar, commentalo/rimuovilo
 })();
 </script>
-
-
 
 <script src="export_year.js" defer></script>
 
