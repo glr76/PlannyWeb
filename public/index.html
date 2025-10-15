@@ -124,35 +124,69 @@ th.datecol, td.datecol {width:100px; min-width:100px; max-width:100px;}
 td, th {padding: 2px 4px;}
 #calendar-container {margin-left:0;margin-right:0;padding-left:4px;padding-right:4px;max-width:100%;}
 #calendar {margin-left:0;margin-right:0;}
-#auth-bar{
-  display:flex; justify-content:center; align-items:center; gap:.5rem;
-  padding:.6rem 1rem; border-bottom:1px solid #ddd; background:var(--panel);
-  position:sticky; top:0; width:100%; z-index:100;
+#topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid #ddd;
+  background: var(--panel);
+  position: sticky;
+  top: 0;
+  width: 100%;
+  z-index: 100;
 }
-#cloud-year-box{
-  display:flex; justify-content:center; align-items:center; gap:.5rem;
-  padding:.6rem 1rem; border-bottom:1px solid #ddd; background:var(--panel);
-  position:sticky; top:48px; width:100%; z-index:90;
+
+/* sotto-sezioni */
+#topbar .left, 
+#topbar .center, 
+#topbar .right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
+
+/* il login centrato davvero al centro orizzontale */
+#topbar .center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* per evitare che il testo a destra si sovrapponga sul centro */
+#topbar .right {
+  margin-left: auto;
+}
+
 
 </style>
 
 </head>
 <body>
-  <div id="auth-bar">
+  <!-- 🔹 Topbar unificata -->
+<div id="topbar">
+  <!-- sinistra: selezione anno -->
+  <div class="left">
+    <label for="cloud-year-select">Anno</label>
+    <select id="cloud-year-select"></select>
+    <button id="btn-cloud-prev" class="btn mini">◀</button>
+    <button id="btn-cloud-next" class="btn mini">▶</button>
+  </div>
+
+  <!-- centro: login -->
+  <div class="center">
     <span id="auth-status">👤 ospite</span>
     <button id="btn-login">Login</button>
     <button id="btn-logout" style="display:none">Logout</button>
   </div>
 
-  <!-- 🔹 Barra ANNO (STATICA) -->
-  <div id="cloud-year-box" class="bar" style="justify-content:center; gap:.5rem; margin-top:8px">
-    <label for="cloud-year-select">Anno</label>
-    <select id="cloud-year-select"></select>
-    <button id="btn-cloud-prev" class="btn mini">◀</button>
-    <button id="btn-cloud-next" class="btn mini">▶</button>
+  <!-- destra: stato -->
+  <div class="right">
     <span id="cloud-status" style="font-size:.9em; opacity:.8;">Pronto</span>
   </div>
+</div>
+
 
   <!-- 🔹 Contenuto principale -->
   <div class="wrap">
