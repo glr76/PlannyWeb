@@ -42,15 +42,54 @@ td, th {padding: 2px 4px;}
   .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#0e1724;border:1px solid var(--border);font-size:12px;color:#b9c6d8}
   .hint{font-size:12px;color:var(--muted)}
 
-  .tabsbar{display:flex;align-items:center;gap:12px;justify-content:space-between;margin-top:6px}
-  /* Tutti i mesi su una riga orizzontale */
+  /* --- Barra superiore con mesi + controlli --- */
+.tabsbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+  flex-wrap: wrap;                /* permette di andare su due righe */
+  margin-top: 6px;
+}
+
+/* --- Sezione dei mesi --- */
 .tabs {
   display: flex;
-  flex-wrap: nowrap;                /* non andare mai a capo */
-  justify-content: space-between;   /* distribuisce i bottoni lungo la riga */
+  flex-wrap: nowrap;              /* mesi sempre su una sola riga */
+  flex: 1 1 auto;                 /* occupano lo spazio disponibile */
+  min-width: 0;                   /* permette compressione */
   gap: 4px;
-  overflow: hidden;                 /* nessuno scroll visibile */
+  overflow: hidden;
 }
+
+.tab {
+  flex: 1 1 auto;                 /* i bottoni si adattano */
+  text-align: center;
+  padding: 8px 0;
+  min-width: 0;
+}
+
+/* --- Area destra con pulsanti ricerca, oggi, download --- */
+.bar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;              /* resta a destra su desktop */
+}
+
+/* --- Su schermi stretti, sposta la barra destra sotto i mesi --- */
+@media (max-width: 900px) {
+  .bar-right {
+    flex: 1 1 100%;               /* prende tutta la riga */
+    order: 2;                     /* va sotto */
+    justify-content: flex-end;    /* allineata a destra */
+    margin-top: 8px;
+  }
+  .tabs {
+    order: 1;                     /* i mesi restano in alto */
+  }
+}
+  /* Tutti i mesi su una riga orizzontale */
 
 .tab {
   flex: 1 1 auto;                   /* i bottoni si ridimensionano per entrare tutti */
