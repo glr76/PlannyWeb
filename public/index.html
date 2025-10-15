@@ -148,13 +148,46 @@ td, th {padding: 2px 4px;}
   .cell.selected{outline:2px solid var(--accent); outline-offset:-2px;}
   .cell.search-hit{box-shadow: inset 0 0 0 3px #f59e0b;}
 
-  .chip{
-    position:absolute; inset:2px; display:flex; align-items:center; justify-content:center;
-    border-radius:12px; border:1px solid var(--chipBorder); background:var(--chip);
-    font-weight:700; cursor:grab; user-select:none; padding:0 16px; font-size:18px; 
-    white-space: nowrap;
+  .chip {
+  position: absolute;
+  inset: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1px solid var(--chipBorder);
+  background: var(--chip);
+  font-weight: 700;
+  cursor: grab;
+  user-select: none;
+  padding: 0 10px;
+  font-size: clamp(12px, 2vw, 16px);               /* più piccolo di base */
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* mentre si trascina */
+.chip:active {
+  cursor: grabbing;
+}
+
+/* varianti colore — lasciate invariate */
+.chip.ts1{color:#ef4444}
+.chip.ts2{color:#3b82f6}
+.chip.att{color:#f59e0b}
+.chip.training{color:#0ea5e9}
+.chip.rec{color:#8b5cf6}
+.chip.holiday{background:var(--holiday); color:#fff}
+.chip.hidden{display:none}
+
+/* --- ✅ Correzione specifica per mobile --- */
+@media (max-width: 768px) {
+  .chip {
+    font-size: 12px;             /* riduce il testo */
+    padding: 0 6px;              /* meno spazio laterale */
+    border-radius: 8px;          /* più compatto */
+  }
 }
   .chip:active{cursor:grabbing}
   .chip.ts1{color:#ef4444} .chip.ts2{color:#3b82f6}
