@@ -1170,12 +1170,23 @@ td.addEventListener('touchcancel',cancelLongPress, {passive:true});
     styleCell(input,input.value,d); syncChip(td); updateRowCount(td.closest('tr'));
   }
   function updateRowCount(tr){
-    const inputs=[...tr.querySelectorAll('input')];
-    const filled=inputs.reduce((a,i)=>a+(i.value.trim()?1:0),0);
-    const total=inputs.length;
-    const tdCount=tr.querySelector('.count');
-    tdCount.textContent=filled; tdCount.className='count '+countClass(filled,total);
+  const inputs = [...tr.querySelectorAll('input')];
+  const filled = inputs.reduce((a,i)=> a + (i.value.trim()?1:0), 0);
+  const total  = inputs.length;
+
+  const tdCount = tr.querySelector('.count');
+  if(!tdCount) return;
+
+  // ricalcola la classe (stessa logica tua)
+  tdCount.className = 'count led ' + countClass(filled, total);
+
+  // assicura il LED e aggiorna tooltip
+  if(!tdCount.querySelector('.dot')){
+    tdCount.innerHTML = '<span class="dot" aria-hidden="true"></span>';
   }
+  tdCount.title = `${filled}/${total}`;
+}
+
 
   /* ------- Header / mesi (scroll continuo) ------- */
   function updateScrollSnapPadding(){
@@ -1214,8 +1225,13 @@ td.addEventListener('touchcancel',cancelLongPress, {passive:true});
         styleCell(input,input.value,dateObj); syncChip(td); tr.appendChild(td);
       });
 
-      const tdCount=document.createElement('td'); tdCount.className='count '+countClass(filled,names.length); tdCount.textContent=filled; tr.appendChild(tdCount);
-      tbody.appendChild(tr);
+      const tdCount = document.createElement('td');
+tdCount.className = 'count led ' + countClass(filled, names.length);
+tdCount.innerHTML = '<span class="dot" aria-hidden="true"></span>';
+tdCount.title = `${filled}/${names.length}`;
+tr.appendChild(tdCount);
+tbody.appendChild(tr);
+
     }
     return tbody;
   }
@@ -1948,6 +1964,33 @@ function hideCtx(){
   #cloud-year-box select{padding:4px 8px;border-radius:6px;border:1px solid #c8ced8}
   #cloud-year-badge{font:12px monospace;opacity:.7}
 </style>
+<style>
+/* === LED per colonna conteggio === */
+.count.led { text-align: center; }
+
+.count.led .dot{
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,.75), 0 1px 3px rgba(0,0,0,.25);
+}
+
+/* Non colorare più il fondo della cella conteggio */
+.count.led.c-white,
+.count.led.c-yellow,
+.count.led.c-orange,
+.count.led.c-red{
+  background: transparent !important;
+}
+
+/* Colori del LED (riusiamo la tua logica di classi) */
+.count.led.c-white .dot { background: #9ca3af; }  /* grigio */
+.count.led.c-yellow .dot{ background: #facc15; }  /* giallo  */
+.count.led.c-orange .dot{ background: #f59e0b; }  /* arancio */
+.count.led.c-red .dot   { background: #ef4444; }  /* rosso   */
+</style>
+
 <script>
 (function(){
   const API = '/api/files/public/';
