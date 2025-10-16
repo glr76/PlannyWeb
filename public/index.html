@@ -1262,6 +1262,12 @@ if(!inEditing && !isFormEl){
     __ctxArmed = true;
   }
 });
+// ADD: iOS fix — armo il guard anche su touch
+ctx.addEventListener('touchstart', (e)=>{
+  if (e.target.closest('.itm')) {
+    __ctxArmed = true;
+  }
+}, { passive: true });
 
   function showCtx(x, y){
    __ctxArmed = false;
