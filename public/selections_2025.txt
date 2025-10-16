@@ -1076,7 +1076,7 @@
 23-10-2025,Fabio,A.D.R.
 23-10-2025,Fabrizio,A.D.R.
 23-10-2025,Gabriele,Ferie
-23-10-2025,Lorenzo,__DEL__
+23-10-2025,Lorenzo,CAM4930
 23-10-2025,Michelangelo,UNITY
 23-10-2025,Raffaele,UNITY
 24-10-2025,Alfredo,Assente
