@@ -244,18 +244,13 @@
       e.stopPropagation();
       const cmd = it.dataset.cmd;
       hideCtx();
-
-      // Garantisci che esista una selezione coerente con il target del menu
-      if (state.ctxTarget) ensureSelectionOn(state.ctxTarget);
-
       try{
         if (cmd === 'copy') {
           copySelectionToClipboard();
         } else if (cmd === 'paste') {
-          pasteFromClipboardAt(state.ctxTarget || state.anchorCell);
+          pasteFromClipboardAt(state.ctxTarget);
         } else if (cmd === 'clear') {
-          const td = state.ctxTarget || state.anchorCell;
-          if (td) writeCell(td, '');
+          if (state.ctxTarget) writeCell(state.ctxTarget, '');
         }
       }catch(_){ /* noop */ }
     }
@@ -265,29 +260,6 @@
     ctx.addEventListener('touchstart', (e)=>{ if (e.target.closest('.itm')) __ctxArmed = true; e.stopPropagation(); e.preventDefault(); }, {passive:false});
     ctx.addEventListener('click', handleCtxAction, false);
     ctx.addEventListener('touchend', handleCtxAction, {passive:false});
-
-    // === Apertura menu dai tre puntini (⋯) dentro la chip ===
-    document.addEventListener('click', (e) => {
-      const btn = e.target && e.target.closest('.chip .more');
-      if (!btn) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const td = btn.closest('td.cell');
-      if(!td) return;
-      const r = btn.getBoundingClientRect();
-      openCtxForCell(td, Math.round(r.left), Math.round(r.bottom + 6));
-    }, { capture: true });
-
-    document.addEventListener('touchend', (e) => {
-      const btn = e.target && e.target.closest('.chip .more');
-      if (!btn) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const td = btn.closest('td.cell');
-      if(!td) return;
-      const r = btn.getBoundingClientRect();
-      openCtxForCell(td, Math.round(r.left), Math.round(r.bottom + 6));
-    }, { passive:false, capture: true });
 
     // Cattura eventi fuori dal menu per non richiuderlo prematuramente (multi-pointer compat)
     ['pointerdown','mousedown','touchstart','touchend','click'].forEach(function(type){
@@ -329,18 +301,7 @@
     // ===== Selezione & clipboard =====
     function clearSelection(){ state.selected.forEach(td=>td.classList.remove('selected')); state.selected.clear(); }
     function addToSelection(td){ if(!td || !td.classList.contains('cell')) return; if(!state.selected.has(td)){ state.selected.add(td); td.classList.add('selected'); } state.anchorCell = td; }
-    function ensureSelectionOn(td){
-      if(!td || !td.classList.contains('cell')) return;
-      // Se non c'è una selezione attiva, seleziona questa cella.
-      if (!state.selected.size) {
-        clearSelection();
-        addToSelection(td);
-      } else if (!state.selected.has(td)) {
-        // opzionale: preferisci sostituire sempre la selezione?
-        // clearSelection(); addToSelection(td);
-      }
-      state.anchorCell = td;
-    }
+    function ensureSelectionOn(td){ if(!td || !td.classList.contains('cell')) return; clearSelection(); addToSelection(td); state.anchorCell = td; }
 
     function selectionBounds(){
       let minR=Infinity, maxR=-Infinity, minC=Infinity, maxC=-Infinity;
@@ -500,17 +461,6 @@
 
       // context menu apertura
       td.addEventListener('contextmenu', (e)=>{ e.preventDefault(); const r = td.getBoundingClientRect(); const cx = e.clientX || (r.left + r.width/2); const cy = e.clientY || (r.top + r.height/2); openCtxForCell(td, cx, cy); });
-
-      // === Long-press (iOS/tablet) per aprire il menu su celle senza chip ===
-      let __lp_timer = null;
-      td.addEventListener('touchstart', (e)=>{
-        if (e.target.closest('.chip')) return; // se tocchi il chip, non attivare long-press della cella
-        __lp_timer = setTimeout(()=>{
-          const r = td.getBoundingClientRect();
-          openCtxForCell(td, Math.round(r.left + r.width/2), Math.round(r.top + r.height/2));
-        }, 550); // 550ms ~ long-press
-      }, {passive:true});
-      ['touchend','touchcancel','touchmove'].forEach(ev=> td.addEventListener(ev, ()=>{ if(__lp_timer){ clearTimeout(__lp_timer); __lp_timer=null; } }, {passive:true}));
 
       td.appendChild(input); td.appendChild(chip); return td;
     }
