@@ -119,7 +119,7 @@ td, th {padding: 2px 4px;}
   .btn{appearance:none;border:1px solid var(--border);background:var(--surface);color:var(--text);padding:10px 12px;border-radius:10px;cursor:pointer}
   .btn.mini{padding:6px 10px;font-size:12px}
   .searchbox{display:flex;gap:6px;align-items:center}
-  .searchbox input{width:180px;padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:var(--surface)}
+  .searchbox input{width:90px;padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:var(--surface)}
   .search-count{font-size:12px;color:var(--muted);min-width:60px;text-align:center}
 
   .month{margin-top:10px;max-height:68vh;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;position:relative;scroll-snap-type:y mandatory;scroll-padding-top:48px}
@@ -330,7 +330,7 @@ td, th {padding: 2px 4px;}
         <div class="tabs" id="tabs"></div>
         <div class="bar-right">
           <div class="searchbox">
-            <input id="search-q" type="text" placeholder="Cerca impegno…"/>
+            <input id="search-q" type="text" placeholder="Cerca"/>
             <button id="search-prev" class="btn mini" title="Precedente">Prev</button>
             <button id="search-next" class="btn mini" title="Successivo">Next</button>
             <div id="search-count" class="search-count">0/0</div>
@@ -377,6 +377,47 @@ td, th {padding: 2px 4px;}
     ctx.style.top  = y + 'px';
     ctx.style.display = 'block';
   };
+</script>
+<script>
+// === Inizializza gestione click menu contestuale ===
+(function initCtxMenu(){
+  const menu = document.getElementById('ctx');
+  if (!menu || menu.__bound) return; // evita doppio bind
+
+  menu.addEventListener('click', async (e)=>{
+    const it = e.target.closest('.itm');
+    if(!it) return;
+
+    const cmd = it.dataset.cmd;
+    let td = state.ctxTarget;
+
+    // Se nessuna cella è selezionata, forza selezione su quella del menu
+    if (td && (!state.selected || state.selected.size === 0)) {
+      ensureSelectionOn(td);
+    }
+
+    if(!td){
+      hideCtx();
+      return;
+    }
+
+    // 🔹 Gestione comandi
+    if (cmd === 'copy'){
+      copySelectionToClipboard();
+    } 
+    else if (cmd === 'paste'){
+      pasteFromClipboardAt(td);
+    } 
+    else if (cmd === 'clear'){
+      writeCell(td, '');
+      if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+    }
+
+    hideCtx(); // chiudi sempre il menu
+  });
+
+  menu.__bound = true; // flag per non ricollegare
+})();
 </script>
 
 <script>
@@ -819,16 +860,53 @@ async function saveSelectionsToServer(){
     }
   }
 
-  // Espongo importer selections per year_single_selector.js
-  
 
-  /* ------- Editing / Commit ------- */
-  function enterEdit(td){
-    td.classList.add('editing');
-    const input=td.querySelector('input'), chip=td.querySelector('.chip');
-    chip.classList.add('hidden'); input.classList.remove('hidden');
-    input.dataset.orig=input.value; setTimeout(()=>{input.focus(); input.select(); suggest.open(input);},0);
+function enterEdit(td, selectAll = true) {
+  // retro-compatibilità + supporto opzioni oggetto: {selectAll, initialChar}
+  let initialChar = null;
+  if (typeof selectAll === 'object' && selectAll !== null) {
+    const opts = selectAll;
+    initialChar = opts.initialChar ?? null;
+    selectAll = (opts.selectAll !== undefined) ? !!opts.selectAll : true;
   }
+
+  td.classList.add('editing');
+  const input = td.querySelector('input');
+  const chip  = td.querySelector('.chip');
+
+  if (chip) chip.classList.add('hidden');
+  if (input) input.classList.remove('hidden');
+
+  if (input) {
+    input.dataset.orig = input.value;
+
+    // ⏱️ Importantissimo: focus e caret dopo il paint
+    setTimeout(() => {
+      input.focus();
+
+      if (selectAll) {
+        // F2 / doppio click: seleziona tutto
+        input.select();
+      } else {
+        // Tasto stampabile: inseriamo SUBITO il primo carattere
+        if (initialChar != null) {
+          input.value = String(initialChar);
+        }
+        // caret in coda
+        try {
+          const end = input.value.length;
+          input.setSelectionRange(end, end);
+        } catch(_) {}
+      }
+
+      // riapri i suggerimenti sul valore corrente
+      if (typeof suggest?.open === 'function') {
+        suggest.open(input);
+      }
+    }, 0);
+  }
+}
+
   function onCellCommit(input){
     // delega a writeCell per garantire logging unico
     const td = input.closest('td.cell');
@@ -925,7 +1003,41 @@ function makeCell(date,name){
     td.addEventListener('dragleave', ()=> td.classList.remove('droptarget'));
     td.addEventListener('drop', e=>{
       e.preventDefault(); td.classList.remove('droptarget');
-      const payload=e.dataTransfer.getData('application/x-planny'); if(!payload) return;
+    // --- Context menu su DESKTOP (right-click)
+td.addEventListener('contextmenu', (e)=>{
+  e.preventDefault();
+  const r = td.getBoundingClientRect();
+  const cx = e.clientX || (r.left + r.width/2);
+  const cy = e.clientY || (r.top  + r.height/2);
+  openCtxForCell(td, cx, cy);
+});
+
+// --- Long-press su MOBILE / iOS
+let lpTimer = null;
+td.addEventListener('touchstart', (e)=>{
+  // non blocchiamo lo scroll: listener passive
+  const t = e.touches && e.touches[0];
+  if(!t) return;
+  lpTimer = setTimeout(()=>{
+    const r = td.getBoundingClientRect();
+    const cx = t.clientX || (r.left + r.width/2);
+    const cy = t.clientY || (r.top  + r.height/2);
+    openCtxForCell(td, cx, cy);
+  }, 500); // ~0.5s long-press
+}, {passive:true});
+
+function cancelLongPress(){
+  if(lpTimer){ clearTimeout(lpTimer); lpTimer = null; }
+}
+td.addEventListener('touchmove',  cancelLongPress, {passive:true});
+td.addEventListener('touchend',   cancelLongPress, {passive:true});
+td.addEventListener('touchcancel',cancelLongPress, {passive:true});
+  
+	  
+	  
+	  
+	  
+	  const payload=e.dataTransfer.getData('application/x-planny'); if(!payload) return;
       let data=null; try{data=JSON.parse(payload);}catch(_){}
       if(!data) return;
       const fromKey=data.fromKey, value=data.value, toKey=td.dataset.key;
@@ -962,34 +1074,93 @@ function makeCell(date,name){
   }
 
   function syncChip(td){
-    const input=td.querySelector('input'), chip=td.querySelector('.chip');
-    const val=(input.value||'').trim();
-    if(td.classList.contains('editing')){ chip.classList.add('hidden'); input.classList.remove('hidden'); return; }
-    if(val){
-      chip.textContent=val;
-	  // pulsante "⋯" per aprire il menu con un tap
-if(!chip.querySelector('.more')){
-  const btn=document.createElement('button');
-  btn.className='more'; btn.type='button'; btn.textContent='⋯';
-  btn.addEventListener('click',(e)=>{
-    e.stopPropagation();
-    const r = btn.getBoundingClientRect();
-    const x = r.right, y = r.bottom + 2;
-    window.state.ctxTarget = td;
-    showCtx(x,y);
-  });
-  chip.appendChild(btn);
-}
-      chip.title = val;
-      let klass='chip '+styleToken(val);
-      const parts=td.dataset.date.split('-'); const d=new Date(+parts[2], +parts[1]-1, +parts[0]);
-      if(isHolidayOrWeekend(d)) klass+=' holiday';
-      chip.className=klass; chip.classList.remove('hidden'); input.classList.add('hidden');
-    }else{
-      chip.removeAttribute('title');
-      chip.textContent=''; chip.className='chip hidden'; input.classList.remove('hidden');
-    }
+  const input = td.querySelector('input');
+  const chip  = td.querySelector('chip') ? td.querySelector('chip') : td.querySelector('.chip'); // safety
+  const val   = (input.value || '').trim();
+
+  // Se in editing: mostra input, nascondi chip
+  if (td.classList.contains('editing')) {
+    chip.classList.add('hidden');
+    input.classList.remove('hidden');
+    return;
   }
+
+  if (val) {
+    // Testo + tooltip
+    chip.textContent = val;
+    chip.title = val;
+
+    // Classi di stile
+    let klass = 'chip ' + styleToken(val);
+    const parts = td.dataset.date.split('-');
+    const d = new Date(+parts[2], +parts[1]-1, +parts[0]);
+    if (isHolidayOrWeekend(d)) klass += ' holiday';
+    chip.className = klass;
+
+    chip.classList.remove('hidden');
+    input.classList.add('hidden');
+
+    // ✅ BIND UNA SOLA VOLTA gli handler specifici del chip
+    if (!chip.__ctxBound) {
+      chip.__ctxBound = true;
+
+      // Doppio click = entra in edit (desktop)
+      chip.addEventListener('dblclick', (e)=>{
+        e.preventDefault();
+        e.stopPropagation();
+        enterEdit(td, { selectAll: true, initialChar: null });
+      });
+
+      // Tap singolo su device touch = entra in edit (qualità di vita)
+      chip.addEventListener('click', (e)=>{
+        if (window.matchMedia('(pointer: coarse)').matches) {
+          e.preventDefault();
+          e.stopPropagation();
+          enterEdit(td, { selectAll: false, initialChar: null });
+        }
+      });
+
+      // 👉 Context menu su DESKTOP (tasto destro)
+      chip.addEventListener('contextmenu', (e)=>{
+        e.preventDefault();
+        e.stopPropagation();
+        const r = chip.getBoundingClientRect();
+        const cx = e.clientX || (r.left + r.width/2);
+        const cy = e.clientY || (r.top  + r.height/2);
+        openCtxForCell(td, cx, cy); // seleziona + apre menu
+      });
+
+      // 👉 Long-press su iOS / mobile
+      let lpTimer = null;
+      const cancelLP = ()=>{ if (lpTimer){ clearTimeout(lpTimer); lpTimer = null; } };
+
+      chip.addEventListener('touchstart', (e)=>{
+        const t = e.touches && e.touches[0];
+        if (!t) return;
+        cancelLP();
+        lpTimer = setTimeout(()=>{
+          const r = chip.getBoundingClientRect();
+          const cx = t.clientX || (r.left + r.width/2);
+          const cy = t.clientY || (r.top  + r.height/2);
+          openCtxForCell(td, cx, cy); // seleziona + apre menu
+        }, 500); // 0.5s
+      }, { passive: true });
+
+      chip.addEventListener('touchmove',  cancelLP, { passive: true });
+      chip.addEventListener('touchend',   cancelLP, { passive: true });
+      chip.addEventListener('touchcancel',cancelLP, { passive: true });
+    }
+
+  } else {
+    // Nessun valore: mostra input
+    chip.removeAttribute('title');
+    chip.textContent = '';
+    chip.className = 'chip hidden';
+    input.classList.remove('hidden');
+  }
+}
+
+
 
   // Espongo importer selections per year_single_selector.js
   function refreshCellByKey(key){
@@ -1346,6 +1517,20 @@ function scheduleAutoSave(delayMs = 800){
     grid.forEach(r=>{ if(r.length<w) r.push(...Array(w-r.length).fill('')); });
     return {grid, w, h:grid.length};
   }
+  // === Helpers per context menu / selezione ===
+function ensureSelectionOn(td){
+  if(!td || !td.classList.contains('cell')) return;
+  clearSelection();
+  addToSelection(td);
+  state.anchorCell = td;
+}
+
+function openCtxForCell(td, x, y){
+  ensureSelectionOn(td);
+  state.ctxTarget = td;
+  showCtx(x, y);
+}
+  
   async function copySelectionToClipboard(){
     if(state.selected.size===0){ log('Nessuna cella selezionata.','warn'); return; }
     const {grid} = gridFromSelection();
@@ -1458,25 +1643,33 @@ document.addEventListener('keydown', (e)=>{
         if(state.search.q) buildSearchHits(state.search.q);
       }
     }
-    // START EDITING
-    if(!inEditing && !isFormEl){
-      const td = state.anchorCell || (state.selected.size ? Array.from(state.selected)[0] : null);
-      if(td && td.classList.contains('cell')){
-        const key = e.key;
-        const isPrintable = key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
-        const isF2 = key === 'F2';
-        if(isPrintable || isF2){
-          e.preventDefault();
-          enterEdit(td);
-          const input = td.querySelector('input');
-          if(isPrintable && input){
-            input.value = key;
-            try{ input.setSelectionRange(input.value.length, input.value.length); }catch(_){}
-          }
-          return;
-        }
+   
+   
+// START EDITING
+if(!inEditing && !isFormEl){
+  const td = state.anchorCell || (state.selected.size ? Array.from(state.selected)[0] : null);
+  if(td && td.classList.contains('cell')){
+    const key = e.key;
+    const isPrintable = key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
+    const isF2 = key === 'F2';
+
+    if(isPrintable || isF2){
+      e.preventDefault();
+
+      if (isF2) {
+        // F2: entra in edit e seleziona tutto
+        enterEdit(td, { selectAll: true, initialChar: null });
+      } else {
+        // Tasto stampabile: entra in edit SENZA selezionare tutto
+        // e inietta in modo affidabile il primo carattere
+        enterEdit(td, { selectAll: false, initialChar: key });
       }
+      return;
     }
+  }
+}
+
+
 
     // Close context menu on ESC
     if(e.key === 'Escape'){ hideCtx(); }
@@ -1913,7 +2106,7 @@ function hideCtx(){
   const badge = document.createElement('div');
   badge.id = 'save-indicator';
   badge.style.cssText = `
-    position: fixed; top:10px; right:14px; z-index:9999;
+    position: fixed; top:4px; right:14px; z-index:9999;
     padding:8px 14px; border-radius:12px; font-weight:600;
     font-family: system-ui, sans-serif; box-shadow:0 2px 8px rgba(0,0,0,0.15);
     background:#14532d; color:#dcfce7; transition: background .2s, color .2s, opacity .2s; opacity:.95; pointer-events:none;
