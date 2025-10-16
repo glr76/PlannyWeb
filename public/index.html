@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <html lang="it">
- <head>
-  <style>
-   #terminal, .terminal, #console, .console, #log, .log{height:140px !important;max-height:140px !important;overflow-y:auto !important}
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Planny HTML</title>
+<style id="addon-terminal-minheight-v3">#terminal, .terminal, #console, .console, #log, .log{height:140px !important;max-height:140px !important;overflow-y:auto !important}
 .ln.ln-cell{background:transparent;padding:0;margin:2px 0}
 .terminal .ln{background:transparent !important}
 .terminal .ln.ln-cell{background:transparent !important;padding:0;margin:2px 0}
@@ -12,9 +14,8 @@ td, th{padding:2px 4px}
 #calendar{margin-left:0;margin-right:0}
 .wrap{max-width:100% !important;margin:0 !important;padding-left:6px !important;padding-right:6px !important}
 .card{padding-left:8px !important;padding-right:8px !important}
-.month{margin-top:8px}
-
-:root{--bg:#f5f7fb;--panel:#ffffff;--surface:#eef2f7;--border:#dfe5ef;--text:#0f1720;--muted:#5b6877;--accent:#2563eb;--accent2:#16a34a;--warn:#d97706;--holiday:#166534;--chip:#f3f8ff;--chipBorder:#cfd9ea;--todayRow:rgba(34,197,94,.18);--nameHeaderBg:#e9f3ff;--nameColBg:#f8fbff}
+.month{margin-top:8px}</style>
+<style>:root{--bg:#f5f7fb;--panel:#ffffff;--surface:#eef2f7;--border:#dfe5ef;--text:#0f1720;--muted:#5b6877;--accent:#2563eb;--accent2:#16a34a;--warn:#d97706;--holiday:#166534;--chip:#f3f8ff;--chipBorder:#cfd9ea;--todayRow:rgba(34,197,94,.18);--nameHeaderBg:#e9f3ff;--nameColBg:#f8fbff}
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu}
 h1{font-size:20px;margin:0 0 10px}
@@ -107,114 +108,19 @@ td, th{padding:2px 4px}
 #topbar .center{position:absolute;left:50%;transform:translateX(-50%)}
 #topbar .right{margin-left:auto}
 #calendar, #month, .cell, .chip, body{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;touch-action:manipulation}
-#ctx{touch-action:none}
+#ctx{touch-action:none}</style>
+</head>
+<body>
+<div id="topbar"><div class="left"><label for="cloud-year-select">Anno</label><select id="cloud-year-select"></select></div><div class="center"><span id="auth-status">👤 ospite</span><button id="btn-login">Login</button><button id="btn-logout" style="display:none">Logout</button></div></div>
+<div class="wrap">
+<div class="card" style="margin-top:10px"><div class="tabsbar"><div class="tabs" id="tabs"></div><div class="bar-right"><div class="searchbox"><input id="search-q" type="text" placeholder="Cerca"/><button id="search-prev" class="btn mini" title="Precedente">Prev</button><button id="search-next" class="btn mini" title="Successivo">Next</button><div id="search-count" class="search-count">0/0</div></div><button id="jump-today" class="btn mini" title="Vai a oggi">Oggi</button><button id="btn-export-year" class="btn mini" title="Scarica selections e log dell'anno">Download</button><input id="upload-input" type="file" style="display:none" /><button id="btn-upload-file" class="btn mini" title="Carica un file nella cartella public">Upload</button></div></div><div id="month" class="month"><table id="calendar"><thead id="thead"></thead></table></div></div>
+<div class="card" style="margin-top:10px"><h2 style="margin:0 0 8px;font-size:14px;color:#9bb0c9">Terminale</h2><div id="terminal" class="terminal" aria-live="polite" aria-atomic="false"></div></div>
+<div id="ctx" class="ctx" role="menu" aria-hidden="true"><div class="itm" data-cmd="copy" tabindex="0">Copia</div><div class="itm" data-cmd="paste" tabindex="0">Incolla</div><div class="sep"></div><div class="itm" data-cmd="clear" tabindex="0">Cancella</div></div>
+<datalist id="options-list"></datalist>
+<script>
 
-#cloud-year-box{display:flex;gap:6px;align-items:center;margin:6px 8px}
-#cloud-year-box label{opacity:.8;font-size:12px}
-#cloud-year-box select{padding:4px 8px;border-radius:6px;border:1px solid #c8ced8}
-#cloud-year-badge{font:12px monospace;opacity:.7}
 
-.count.led{text-align:center}
-.count.led .dot{display:inline-block;width:12px;height:12px;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(255,255,255,.75), 0 1px 3px rgba(0,0,0,.25)}
-.count.led.c-white, .count.led.c-yellow, .count.led.c-orange, .count.led.c-red{background:transparent !important}
-.count.led.c-white .dot{background:green}
-.count.led.c-yellow .dot{background:yellow}
-.count.led.c-orange .dot{background:orange}
-.count.led.c-red .dot{background:red}
-  </style>
-  <meta charset="utf-8"/>
-  <meta content="width=device-width, initial-scale=1" name="viewport"/>
-  <title>
-   Planny HTML
-  </title>
- </head>
- <body>
-  <div id="topbar">
-   <div class="left">
-    <label for="cloud-year-select">
-     Anno
-    </label>
-    <select id="cloud-year-select">
-    </select>
-   </div>
-   <div class="center">
-    <span id="auth-status">
-     👤 ospite
-    </span>
-    <button id="btn-login">
-     Login
-    </button>
-    <button id="btn-logout" style="display:none">
-     Logout
-    </button>
-   </div>
-  </div>
-  <div class="wrap">
-   <div class="card" style="margin-top:10px">
-    <div class="tabsbar">
-     <div class="tabs" id="tabs">
-     </div>
-     <div class="bar-right">
-      <div class="searchbox">
-       <input id="search-q" placeholder="Cerca" type="text"/>
-       <button class="btn mini" id="search-prev" title="Precedente">
-        Prev
-       </button>
-       <button class="btn mini" id="search-next" title="Successivo">
-        Next
-       </button>
-       <div class="search-count" id="search-count">
-        0/0
-       </div>
-      </div>
-      <button class="btn mini" id="jump-today" title="Vai a oggi">
-       Oggi
-      </button>
-      <button class="btn mini" id="btn-export-year" title="Scarica selections e log dell'anno">
-       Download
-      </button>
-      <input id="upload-input" style="display:none" type="file"/>
-      <button class="btn mini" id="btn-upload-file" title="Carica un file nella cartella public">
-       Upload
-      </button>
-     </div>
-    </div>
-    <div class="month" id="month">
-     <table id="calendar">
-      <thead id="thead">
-      </thead>
-     </table>
-    </div>
-   </div>
-   <div class="card" style="margin-top:10px">
-    <h2 style="margin:0 0 8px;font-size:14px;color:#9bb0c9">
-     Terminale
-    </h2>
-    <div aria-atomic="false" aria-live="polite" class="terminal" id="terminal">
-    </div>
-   </div>
-   <div aria-hidden="true" class="ctx" id="ctx" role="menu">
-    <div class="itm" data-cmd="copy" tabindex="0">
-     Copia
-    </div>
-    <div class="itm" data-cmd="paste" tabindex="0">
-     Incolla
-    </div>
-    <div class="sep">
-    </div>
-    <div class="itm" data-cmd="clear" tabindex="0">
-     Cancella
-    </div>
-   </div>
-   <datalist id="options-list">
-   </datalist>
-   <script src="upload.js">
-   </script>
-   <script defer="" src="export_year.js">
-   </script>
-  </div>
-  <script>
-   window.hideCtx = window.hideCtx || function(){
+  window.hideCtx = window.hideCtx || function(){
     const ctx = document.getElementById('ctx');
     if (ctx) ctx.style.display = 'none';
   };
@@ -227,9 +133,7 @@ td, th{padding:2px 4px}
     ctx.style.display = 'block';
   };
 
-
-
-
+</script><script>
 
 
 (function initCtxMenu(){
@@ -269,9 +173,7 @@ td, th{padding:2px 4px}
   menu.__bound = true;
 })();
 
-
-
-
+</script><script>
 
 (function(){
 
@@ -1679,9 +1581,16 @@ function hideCtx(){
   }catch(_){}
 
 })();
-
-
-
+</script><style>#cloud-year-box{display:flex;gap:6px;align-items:center;margin:6px 8px}
+#cloud-year-box label{opacity:.8;font-size:12px}
+#cloud-year-box select{padding:4px 8px;border-radius:6px;border:1px solid #c8ced8}
+#cloud-year-badge{font:12px monospace;opacity:.7}</style><style>.count.led{text-align:center}
+.count.led .dot{display:inline-block;width:12px;height:12px;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(255,255,255,.75), 0 1px 3px rgba(0,0,0,.25)}
+.count.led.c-white, .count.led.c-yellow, .count.led.c-orange, .count.led.c-red{background:transparent !important}
+.count.led.c-white .dot{background:green}
+.count.led.c-yellow .dot{background:yellow}
+.count.led.c-orange .dot{background:orange}
+.count.led.c-red .dot{background:red}</style><script>
 
 (function(){
   const API = '/api/files/public/';
@@ -1823,9 +1732,7 @@ function hideCtx(){
   else boot();
 })();
 
-
-
-
+</script><script>
 
 
 (function(){
@@ -1884,9 +1791,7 @@ function hideCtx(){
   window.__SaveTracker = SaveTracker;
 })();
 
-
-
-
+</script><script>
 
 async function apiMe(){
   const r = await fetch('/me', {credentials:'same-origin'});
@@ -1975,9 +1880,7 @@ window.addEventListener('DOMContentLoaded', ()=>{
   refreshAuthBar();
 });
 
-
-
-
+</script><script>
 
 (function fixTopbar(){
 
@@ -2007,9 +1910,7 @@ window.addEventListener('DOMContentLoaded', ()=>{
 
 })();
 
-
-
-
+</script><script>
 
 
 (function(){
@@ -2085,6 +1986,5 @@ window.addEventListener('DOMContentLoaded', ()=>{
 
   document.addEventListener('scroll', ()=>{ cancel(); hideCtx(); }, true);
 })();
-  </script>
- </body>
-</html>
+
+</script><script src="upload.js"></script><script src="export_year.js" defer></script></body></html>
