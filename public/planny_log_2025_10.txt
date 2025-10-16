@@ -19,3 +19,4 @@
 [8:16:50 AM] Celle cancellate.
 [8:17:44 AM] SET 24-10-2025, Fabrizio,ciao
 [08:19:16] Celle cancellate.
+[08:19:23] DELETE 24-10-2025, Fabrizio,ciao
