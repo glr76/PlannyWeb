@@ -27,3 +27,4 @@
 [08:41:16] Celle cancellate.
 [10:42:22 AM] MOVE 17-10-2025, Lorenzo,AR7289 → 17-10-2025, Fabrizio
 [10:42:26 AM] MOVE 17-10-2025, Fabrizio,AR7289 → 17-10-2025, Lorenzo
+[1:48:00 PM] MOVE 16-10-2025, Fabrizio,Ferie → 17-10-2025, Fabrizio
