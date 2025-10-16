@@ -40,37 +40,7 @@
 (function initCtxMenu(){
   const menu = document.getElementById('ctx');
   if (!menu || menu.__bound) return;
-
-  menu.addEventListener('click', async (e)=>{
-    const it = e.target.closest('.itm');
-    if(!it) return;
-
-    const cmd = it.dataset.cmd;
-    let td = state.ctxTarget;
-
-    if (td && (!state.selected || state.selected.size === 0)) {
-      ensureSelectionOn(td);
-    }
-
-    if(!td){
-      hideCtx();
-      return;
-    }
-
-    if (cmd === 'copy'){
-      copySelectionToClipboard();
-    }
-    else if (cmd === 'paste'){
-      pasteFromClipboardAt(td);
-    }
-    else if (cmd === 'clear'){
-      writeCell(td, '');
-      if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
-    }
-
-    hideCtx();
-  });
-
+  // Legacy handler disattivato: la gestione del menu è definita più sotto.
   menu.__bound = true;
 })();
 </script><script>
@@ -1086,6 +1056,71 @@ function scheduleAutoSave(delayMs = 800){
     return {grid, w, h:grid.length};
   }
 
+async function iosManualPasteDialog() {
+  return new Promise((resolve) => {
+    // container modale
+    const wrap = document.createElement('div');
+    wrap.style.position = 'fixed';
+    wrap.style.inset = '0';
+    wrap.style.background = 'rgba(0,0,0,.35)';
+    wrap.style.zIndex = '99999';
+    wrap.style.display = 'flex';
+    wrap.style.alignItems = 'center';
+    wrap.style.justifyContent = 'center';
+    
+    // box
+    const box = document.createElement('div');
+    box.style.background = 'white';
+    box.style.border = '1px solid var(--border)';
+    box.style.borderRadius = '12px';
+    box.style.width = 'min(560px, 92vw)';
+    box.style.maxWidth = '92vw';
+    box.style.padding = '12px';
+    box.style.boxShadow = '0 12px 28px rgba(0,0,0,.25)';
+    box.style.color = 'var(--text)';
+    box.style.font = '14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu';
+
+    box.innerHTML = `
+      <div style="font-weight:700; margin-bottom:8px;">Incolla</div>
+      <div style="color:var(--muted); font-size:12px; margin-bottom:6px;">
+        Tocca dentro la casella e usa <b>Incolla</b> (long press) oppure la scorciatoia della tastiera.
+      </div>
+      <textarea id="__ios_paste_ta" rows="6" style="width:100%; box-sizing:border-box; border:1px solid var(--border); border-radius:8px; padding:8px; background:var(--surface); color:var(--text);"></textarea>
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px;">
+        <button id="__ios_paste_cancel" class="btn mini">Annulla</button>
+        <button id="__ios_paste_ok" class="btn mini">OK</button>
+      </div>
+    `;
+    wrap.appendChild(box);
+    document.body.appendChild(wrap);
+
+    const ta = box.querySelector('#__ios_paste_ta');
+    const btnOk = box.querySelector('#__ios_paste_ok');
+    const btnCancel = box.querySelector('#__ios_paste_cancel');
+
+    // focus per far comparire il menu Incolla su iOS
+    setTimeout(() => { try { ta.focus(); } catch(_){} }, 0);
+
+    btnOk.addEventListener('click', () => {
+      const v = ta.value || '';
+      document.body.removeChild(wrap);
+      resolve(v.trim() ? v : null);
+    });
+    btnCancel.addEventListener('click', () => {
+      document.body.removeChild(wrap);
+      resolve(null);
+    });
+    wrap.addEventListener('click', (e) => {
+      if (e.target === wrap) { /* click fuori = annulla */
+        document.body.removeChild(wrap);
+        resolve(null);
+      }
+    });
+  });
+}
+
+
+
 function ensureSelectionOn(td){
   if(!td || !td.classList.contains('cell')) return;
   clearSelection();
@@ -1115,16 +1150,31 @@ function openCtxForCell(td, x, y){
     }catch(err){ log('Copia non riuscita: '+err.message,'warn'); }
   }
   async function pasteFromClipboardAt(startTd){
-    let txt='';
-    try{ if(navigator.clipboard?.readText) txt = await navigator.clipboard.readText(); }catch(e){}
-    if(!txt){
-      const manual = prompt('Incolla qui il contenuto, poi premi OK:','');
-      if(manual==null) return;
-      txt = manual;
+  if(!startTd) return;
+
+  let txt = '';
+  // 1) Prova API moderna (se disponibile)
+  try {
+    if (navigator.clipboard?.readText) {
+      txt = await navigator.clipboard.readText();
     }
-    const payload = gridFromText(txt);
-    pasteGridAt(startTd, payload.grid);
+  } catch (_) {}
+
+  // 2) Se è vuoto o bloccato, usa il fallback su iOS (textarea modale)
+  if (!txt || !txt.trim()) {
+    const maybe = await iosManualPasteDialog();  // <--- NUOVO fallback affidabile su iOS
+    if (maybe == null) {
+      log('Niente da incollare.','warn');
+      return;
+    }
+    txt = maybe;
   }
+
+  // 3) Parsa e incolla
+  const payload = gridFromText(txt);
+  pasteGridAt(startTd, payload.grid);
+}
+
   function pasteGridAt(startTd, grid){
     if(!startTd) return;
     const table = document.getElementById('calendar');
@@ -1265,6 +1315,22 @@ if(!inEditing && !isFormEl){
   }, true); // capture = true
 });
 
+// Fix iOS: consenti ai tocchi sugli elementi del menu di funzionare
+ctx.querySelectorAll('.itm').forEach(itm=>{
+  itm.addEventListener('touchend', (e)=>{
+    e.stopPropagation();
+    e.preventDefault();
+    const cmd = itm.dataset.cmd;
+    hideCtx();
+    if (cmd === 'copy') copySelectionToClipboard();
+    else if (cmd === 'paste') pasteFromClipboardAt(state.ctxTarget);
+    else if (cmd === 'clear') {
+      if (state.ctxTarget) writeCell(state.ctxTarget, '');
+    }
+  }, {passive:false});
+});
+
+
   let __ctxArmed = false;
   ctx.addEventListener('mousedown', (e)=>{
 
@@ -1335,34 +1401,42 @@ function hideCtx(){
   const it = e.target.closest('.itm');
   if (!it || !__ctxArmed) return;
 
-  e.preventDefault();      // NEW
-  e.stopPropagation();     // NEW
+  e.preventDefault();
+  e.stopPropagation();
+  e.stopImmediatePropagation();   // <--- aggiunta
 
   __ctxArmed = false;
 
   const cmd = it.dataset.cmd;
-  hideCtx();
+
+  // PRIMA leggo la cella di destinazione
+  const startTd = state.ctxTarget || state.anchorCell;
 
   if (cmd === 'copy') {
     copySelectionToClipboard();
+
   } else if (cmd === 'paste') {
-    const startTd = state.ctxTarget || state.anchorCell;
-    if (!startTd) { log('Seleziona una cella dove incollare.','warn'); return; }
+    if (!startTd) { log('Seleziona una cella dove incollare.','warn'); hideCtx(); return; }
     await pasteFromClipboardAt(startTd);
+
   } else if (cmd === 'clear') {
     if (state.selected.size) {
       state.selected.forEach(td => writeCell(td, ''));
-      if(state.search.q) buildSearchHits(state.search.q);
+      if (state.search.q) buildSearchHits(state.search.q);
       log('Celle cancellate.','cell');
       saveNow();
     } else if (state.ctxTarget) {
       writeCell(state.ctxTarget,'');
-      if(state.search.q) buildSearchHits(state.search.q);
+      if (state.search.q) buildSearchHits(state.search.q);
       log('Cella cancellata.','cell');
       saveNow();
     }
   }
+
+  // SOLO alla fine nascondo il menu (qui è safe)
+  hideCtx();
 });
+
 
 
   const qEl = document.getElementById('search-q');
