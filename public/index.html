@@ -575,26 +575,6 @@ td.addEventListener('contextmenu', (e)=>{
   openCtxForCell(td, cx, cy);
 });
 
-let lpTimer = null;
-td.addEventListener('touchstart', (e)=>{
-
-  const t = e.touches && e.touches[0];
-  if(!t) return;
-  lpTimer = setTimeout(()=>{
-    const r = td.getBoundingClientRect();
-    const cx = t.clientX || (r.left + r.width/2);
-    const cy = t.clientY || (r.top  + r.height/2);
-    openCtxForCell(td, cx, cy);
-  }, 500);
-}, {passive:true});
-
-function cancelLongPress(){
-  if(lpTimer){ clearTimeout(lpTimer); lpTimer = null; }
-}
-td.addEventListener('touchmove',  cancelLongPress, {passive:true});
-td.addEventListener('touchend',   cancelLongPress, {passive:true});
-td.addEventListener('touchcancel',cancelLongPress, {passive:true});
-
 	  const payload=e.dataTransfer.getData('application/x-planny'); if(!payload) return;
       let data=null; try{data=JSON.parse(payload);}catch(_){}
       if(!data) return;
@@ -681,25 +661,6 @@ td.addEventListener('touchcancel',cancelLongPress, {passive:true});
         const cy = e.clientY || (r.top  + r.height/2);
         openCtxForCell(td, cx, cy);
       });
-
-      let lpTimer = null;
-      const cancelLP = ()=>{ if (lpTimer){ clearTimeout(lpTimer); lpTimer = null; } };
-
-      chip.addEventListener('touchstart', (e)=>{
-        const t = e.touches && e.touches[0];
-        if (!t) return;
-        cancelLP();
-        lpTimer = setTimeout(()=>{
-          const r = chip.getBoundingClientRect();
-          const cx = t.clientX || (r.left + r.width/2);
-          const cy = t.clientY || (r.top  + r.height/2);
-          openCtxForCell(td, cx, cy);
-        }, 500);
-      }, { passive: true });
-
-      chip.addEventListener('touchmove',  cancelLP, { passive: true });
-      chip.addEventListener('touchend',   cancelLP, { passive: true });
-      chip.addEventListener('touchcancel',cancelLP, { passive: true });
     }
 
   } else {
@@ -1313,17 +1274,14 @@ if(!inEditing && !isFormEl){
     else { log('Seleziona una cella dove incollare.','warn'); return; }
     pasteGridAt(startTd, payload.grid);
   });
-
-  const ctx = document.getElementById('ctx');
-  // iOS tap-through fix: impedisco che gli eventi del menu trapassino alla griglia
 ['pointerdown','mousedown','touchstart','touchend','click'].forEach(function(type){
   ctx.addEventListener(type, function(e){
-    // Se sto interagendo con un item del menu, NON bloccare l'evento:
     if (e.target && e.target.closest('.itm')) return;
-    // Altrimenti, blocca per evitare tap-through sulla griglia
     e.stopPropagation();
-  }, true); // capture = true (ma con eccezione per .itm)
+  }, true);
 });
+
+  const ctx = document.getElementById('ctx');
 // Delegation: esegui i comandi del menu sia su touchend (iOS) che su click (desktop)
 function handleCtxAction(e){
   const it = e.target && e.target.closest('.itm');
@@ -1939,177 +1897,63 @@ window.addEventListener('DOMContentLoaded', ()=>{
   if (saveBadge && saveBadge.parentElement !== right) right.appendChild(saveBadge);
 
 })();
-</script><script>
-
-(function(){
-  const LONGPRESS_MS = 450;
-  const MOVE_TOL = 12;
-  let t=null, start=null, td=null;
-
-  function cancel(){ if(t){clearTimeout(t);} t=null; start=null; td=null; }
-
-  function begin(x,y,cell){
-    cancel(); start={x,y}; td=cell;
-    t=setTimeout(()=>{
-      t=null;
-      if(!td) return;
-
-      try{
-        if(!window.state?.selected?.has(td)){
-          (window.clearSelection||function(){})();
-          (window.addToSelection||function(){})(td);
-          window.state.anchorCell = td;
-        }
-      }catch(_){}
-
-      const rect=document.body.getBoundingClientRect();
-      const px=Math.min(x, rect.width-200);
-      const py=Math.min(y, rect.height-10);
-      window.state.ctxTarget = td;
-      showCtx(px,py);
-    }, LONGPRESS_MS);
-  }
-
-  function moved(x,y){
-    if(!start) return;
-    if(Math.abs(x-start.x)>MOVE_TOL || Math.abs(y-start.y)>MOVE_TOL) cancel();
-  }
-
-  const hasPointer = 'onpointerdown' in window;
-
-  if(hasPointer){
-    document.addEventListener('pointerdown', e=>{
-      if(e.pointerType!=='touch') return;
-      const cell = e.target.closest && e.target.closest('td.cell');
-      if(!cell || cell.classList.contains('editing')) return;
-      begin(e.clientX, e.clientY, cell);
-    }, {passive:true});
-
-    document.addEventListener('pointermove', e=>{
-      if(e.pointerType!=='touch') return;
-      moved(e.clientX, e.clientY);
-    }, {passive:true});
-
-    document.addEventListener('pointerup',   e=>{ if(e.pointerType==='touch') cancel(); }, {passive:true});
-    document.addEventListener('pointercancel', cancel, {passive:true});
-  } else {
-
-    document.addEventListener('touchstart', e=>{
-      if(e.touches.length!==1) return;
-      const t0=e.touches[0];
-      const cell = e.target.closest && e.target.closest('td.cell');
-      if(!cell || cell.classList.contains('editing')) return;
-      begin(t0.clientX, t0.clientY, cell);
-    }, {passive:false});
-
-    document.addEventListener('touchmove', e=>{
-      if(e.touches.length!==1){ cancel(); return; }
-      const t0=e.touches[0];
-      moved(t0.clientX, t0.clientY);
-    }, {passive:true});
-
-    document.addEventListener('touchend', cancel, {passive:true});
-    document.addEventListener('touchcancel', cancel, {passive:true});
-  }
-
-  document.addEventListener('scroll', ()=>{ cancel(); hideCtx(); }, true);
-})();
-</script><script src="upload.js"></script>
+</script>
+<script src="upload.js"></script>
 <script src="export_year.js" defer></script>
 <script>
 (function(){
-  // 1) Rendi cliccabile il menu su iOS (tap sugli item)
-  function bindCtxMenuTouch(){
-    var ctx = document.getElementById('ctx');
-    if (!ctx || ctx.__touchBound) return;
-    ctx.__touchBound = true;
-    ctx.querySelectorAll('.itm').forEach(function(itm){
-      itm.addEventListener('touchend', function(e){
-        e.stopPropagation();
-        e.preventDefault();
-        var cmd = itm.dataset.cmd;
-        try { hideCtx(); } catch(_) {}
-        try {
-          if (cmd === 'copy') {
-            if (typeof copySelectionToClipboard === 'function') copySelectionToClipboard();
-          } else if (cmd === 'paste') {
-            if (window.state && typeof pasteFromClipboardAt === 'function')
-              pasteFromClipboardAt(state.ctxTarget);
-          } else if (cmd === 'clear') {
-            if (window.state && state.ctxTarget && typeof writeCell === 'function')
-              writeCell(state.ctxTarget, '');
-          }
-        } catch(_){}
-      }, { passive:false });
-    });
+  // Crea (se serve) il bottone … dentro al chip
+  function ensureMoreButton(chip, td){
+    if (chip.querySelector('.more')) return;
+    const btn = document.createElement('button');
+    btn.className = 'more';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'Apri azioni');
+    btn.textContent = '…';
+    chip.appendChild(btn);
+
+    // handler unico che funziona su iOS e desktop
+    const open = (ev)=>{
+      ev.preventDefault();
+      ev.stopPropagation();
+      try {
+        const r = chip.getBoundingClientRect();
+        const cx = Math.round(r.left + r.width - 10); // vicino al pulsante
+        const cy = Math.round(r.top  + 10);
+        // se c'è la funzione che seleziona la cella, usiamola
+        if (typeof window.openCtxForCell === 'function' && td){
+          openCtxForCell(td, cx, cy);
+        } else if (typeof window.showCtx === 'function'){
+          showCtx(cx, cy);
+          if (window.state) state.ctxTarget = td || null;
+        }
+      } catch(_) {}
+    };
+
+    // tap/click sicuri per iOS
+    btn.addEventListener('touchend', open, {passive:false});
+    btn.addEventListener('click', open, false);
   }
 
-  // 2) Long-press affidabile sui chip (evita DnD nativo e apre il menu)
-  function enableChipLongPress(){
-    document.querySelectorAll('.chip').forEach(function(chip){
-      if (chip.__lpBound) return;
-      chip.__lpBound = true;
-
-      // evita drag nativo che “ruba” il long-press su iOS
+  function enhanceAllChips(){
+    document.querySelectorAll('.chip').forEach(chip=>{
+      const td = chip.closest && chip.closest('td.cell');
+      if (!td) return;
+      ensureMoreButton(chip, td);
+      // Evita che il tap su … trascini il chip
       try { chip.draggable = false; chip.style.webkitUserDrag = 'none'; } catch(_){}
-
-      var timer = null, startX = 0, startY = 0;
-      var MOVE_THR = 10;
-
-      function cancel(){ if (timer) { clearTimeout(timer); timer = null; } }
-
-      chip.addEventListener('touchstart', function(e){
-        var t = (e.touches && e.touches[0]) || null;
-        if (!t) return;
-        e.preventDefault(); // abilita preventDefault (=> passive:false)
-        startX = t.clientX; startY = t.clientY;
-        cancel();
-        timer = setTimeout(function(){
-          var td = chip.closest && chip.closest('td.cell');
-          var r = chip.getBoundingClientRect();
-          var cx = t.clientX || (r.left + r.width/2);
-          var cy = t.clientY || (r.top  + r.height/2);
-          try {
-            if (typeof openCtxForCell === 'function' && td) {
-              openCtxForCell(td, cx, cy);
-            } else if (typeof showCtx === 'function') {
-              showCtx(cx, cy);
-              if (window.state) state.ctxTarget = td || null;
-            }
-          } catch(_){}
-        }, 500);
-      }, { passive:false });
-
-      chip.addEventListener('touchmove', function(e){
-        var t = (e.touches && e.touches[0]) || null;
-        if (!t) return;
-        var dx = Math.abs(t.clientX - startX);
-        var dy = Math.abs(t.clientY - startY);
-        if (dx > MOVE_THR || dy > MOVE_THR) cancel();
-        e.preventDefault(); // evita scroll che cancella il long-press
-      }, { passive:false });
-
-      chip.addEventListener('touchend', function(e){
-        cancel();
-        e.preventDefault(); // evita tap fantasma dopo il long-press
-      }, { passive:false });
-
-      chip.addEventListener('touchcancel', cancel);
     });
   }
 
-  // 3) Inizializza e osserva nuove renderizzazioni
   function init(){
-    bindCtxMenuTouch();
-    enableChipLongPress();
+    enhanceAllChips();
+    // Se il calendario/righe vengono renderizzati dopo, ricollega
     if (typeof MutationObserver === 'function'){
-      var obs = new MutationObserver(function(){
-        bindCtxMenuTouch();
-        enableChipLongPress();
-      });
-      obs.observe(document.body, { childList:true, subtree:true });
+      const obs = new MutationObserver(enhanceAllChips);
+      obs.observe(document.body, {childList:true, subtree:true});
     }
   }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
