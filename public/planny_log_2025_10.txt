@@ -9,3 +9,5 @@
 [6:08:44 PM] SET 24-10-2025, Fabrizio,cazzo
 [8:06:03 AM] DELETE 24-10-2025, Fabrizio,cazzo
 [8:06:03 AM] Celle cancellate.
+[8:09:18 AM] DELETE 24-10-2025, Giuseppe,ddddd
+[8:09:18 AM] Celle cancellate.
