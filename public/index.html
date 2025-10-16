@@ -1316,11 +1316,38 @@ if(!inEditing && !isFormEl){
 
   const ctx = document.getElementById('ctx');
   // iOS tap-through fix: impedisco che gli eventi del menu trapassino alla griglia
-['pointerdown','mousedown','touchstart','touchend','click'].forEach(type=>{
-  ctx.addEventListener(type, (e)=>{
+['pointerdown','mousedown','touchstart','touchend','click'].forEach(function(type){
+  ctx.addEventListener(type, function(e){
+    // Se sto interagendo con un item del menu, NON bloccare l'evento:
+    if (e.target && e.target.closest('.itm')) return;
+    // Altrimenti, blocca per evitare tap-through sulla griglia
     e.stopPropagation();
-  }, true); // capture = true
+  }, true); // capture = true (ma con eccezione per .itm)
 });
+// Delegation: esegui i comandi del menu sia su touchend (iOS) che su click (desktop)
+function handleCtxAction(e){
+  const it = e.target && e.target.closest('.itm');
+  if (!it) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const cmd = it.dataset.cmd;
+  try { hideCtx(); } catch(_){}
+  try {
+    if (cmd === 'copy') {
+      if (typeof copySelectionToClipboard === 'function') copySelectionToClipboard();
+    } else if (cmd === 'paste') {
+      if (window.state && typeof pasteFromClipboardAt === 'function')
+        pasteFromClipboardAt(state.ctxTarget);
+    } else if (cmd === 'clear') {
+      if (window.state && state.ctxTarget && typeof writeCell === 'function')
+        writeCell(state.ctxTarget, '');
+    }
+  } catch(_){}
+}
+
+ctx.addEventListener('touchend', handleCtxAction, {passive:false});
+ctx.addEventListener('click', handleCtxAction, false);
+
 
 // Fix iOS: consenti ai tocchi sugli elementi del menu di funzionare
 ctx.querySelectorAll('.itm').forEach(itm=>{
