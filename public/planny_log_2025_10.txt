@@ -30,3 +30,4 @@
 [1:48:00 PM] MOVE 16-10-2025, Fabrizio,Ferie → 17-10-2025, Fabrizio
 [13:55:49] DELETE 24-10-2025, Lorenzo,CAM4930
 [13:55:49] Celle cancellate.
+[1:57:16 PM] SET 24-10-2025, Lorenzo,CAM4930
