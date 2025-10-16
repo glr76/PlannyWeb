@@ -1274,6 +1274,7 @@ if(!inEditing && !isFormEl){
     else { log('Seleziona una cella dove incollare.','warn'); return; }
     pasteGridAt(startTd, payload.grid);
   });
+   const ctx = document.getElementById('ctx');
 ['pointerdown','mousedown','touchstart','touchend','click'].forEach(function(type){
   ctx.addEventListener(type, function(e){
     if (e.target && e.target.closest('.itm')) return;
@@ -1281,7 +1282,7 @@ if(!inEditing && !isFormEl){
   }, true);
 });
 
-  const ctx = document.getElementById('ctx');
+ 
 // Delegation: esegui i comandi del menu sia su touchend (iOS) che su click (desktop)
 function handleCtxAction(e){
   const it = e.target && e.target.closest('.itm');
