@@ -1050,8 +1050,8 @@
 16-10-2025,Gabriele,TS1
 16-10-2025,Raffaele,MP9235
 17-10-2025,Alfredo,Assente
-17-10-2025,Fabrizio,AR7289
 17-10-2025,Gabriele,TS1
+17-10-2025,Lorenzo,AR7289
 17-10-2025,Raffaele,LA6007
 20-10-2025,Alfredo,Assente
 20-10-2025,Fabio,UM9243
