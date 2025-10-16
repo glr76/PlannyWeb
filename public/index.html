@@ -1456,7 +1456,70 @@ function hideCtx(){
     window.addEventListener('planner:year-changed', reconfigureAfterYearChange);
   }catch(_){}
 
-})();</script><style>#cloud-year-box{display:flex;gap:6px;align-items:center;margin:6px 8px}#cloud-year-box label{opacity:.8;font-size:12px}#cloud-year-box select{padding:4px 8px;border-radius:6px;border:1px solid #c8ced8}#cloud-year-badge{font:12px monospace;opacity:.7}</style><style>.count.led{text-align: center;}.count.led .dot{display: inline-block;width: 24px;height: 24px;border-radius: 50%;box-shadow: inset 0 0 0 2px rgba(255,255,255,.75), 0 1px 3px rgba(0,0,0,.25);}.count.led.c-white, .count.led.c-yellow, .count.led.c-orange, .count.led.c-red{background: transparent !important;}.count.led.c-white .dot{background: green;}.count.led.c-yellow .dot{background: yellow;}.count.led.c-orange .dot{background: orange;}.count.led.c-red .dot{background: red;}</style><script>
+})();
+</script>
+<style>
+  /* Barra anno: inalterata */
+  #cloud-year-box {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin: 6px 8px;
+  }
+  #cloud-year-box label {
+    opacity: .8;
+    font-size: 12px;
+  }
+  #cloud-year-box select {
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid #c8ced8;
+  }
+  #cloud-year-badge {
+    font: 12px monospace;
+    opacity: .7;
+  }
+</style>
+
+<style>
+  /* Celle LED */
+  .count.led {
+    text-align: center;
+  }
+
+  /* Rimuove il bordo grigio e centra verticalmente */
+  td.count.led {
+    border: none;
+    vertical-align: middle;
+    padding: 4px 0;
+  }
+
+  /* Pallino vero e proprio */
+  .count.led .dot {
+    display: inline-block;
+    width: 24px;      /* diametro LED */
+    height: 24px;
+    border-radius: 50%;
+    box-shadow:
+      inset 0 0 0 2px rgba(255,255,255,.75),
+      0 1px 3px rgba(0,0,0,.25);
+  }
+
+  /* Nessun colore di sfondo nella cella */
+  .count.led.c-white,
+  .count.led.c-yellow,
+  .count.led.c-orange,
+  .count.led.c-red {
+    background: transparent !important;
+  }
+
+  /* Colori LED (ora funzionano anche il verde e i nomi “in chiaro”) */
+  .count.led.c-white  .dot { background: green  !important; }
+  .count.led.c-yellow .dot { background: yellow !important; }
+  .count.led.c-orange .dot { background: orange !important; }
+  .count.led.c-red    .dot { background: red    !important; }
+</style>
+<script>
 (function(){
   const API = '/api/files/public/';
   const CFG = ['config.ini'];
