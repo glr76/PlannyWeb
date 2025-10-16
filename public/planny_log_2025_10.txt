@@ -15,3 +15,5 @@
 [8:12:03 AM] SET 24-10-2025, Giuseppe,azz
 [8:16:48 AM] DELETE 24-10-2025, Lorenzo,iao
 [8:16:48 AM] Celle cancellate.
+[8:16:50 AM] DELETE 24-10-2025, Giuseppe,azz
+[8:16:50 AM] Celle cancellate.
