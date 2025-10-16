@@ -7,3 +7,5 @@
 [6:07:53 PM] Celle cancellate.
 [6:08:21 PM] MOVE 24-10-2025, Lorenzo,ddddd → 24-10-2025, Giuseppe
 [6:08:44 PM] SET 24-10-2025, Fabrizio,cazzo
+[8:06:03 AM] DELETE 24-10-2025, Fabrizio,cazzo
+[8:06:03 AM] Celle cancellate.
