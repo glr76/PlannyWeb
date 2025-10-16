@@ -1079,6 +1079,10 @@
 23-10-2025,Michelangelo,UNITY
 23-10-2025,Raffaele,UNITY
 24-10-2025,Alfredo,Assente
+24-10-2025,Giuseppe,CAM4930
+24-10-2025,Lorenzo,CAM4930
+25-10-2025,Giuseppe,CAM4930
+25-10-2025,Lorenzo,CAM4930
 25-10-2025,Raffaele,CAM4930
 27-10-2025,Alfredo,Assente
 27-10-2025,Gabriele,PG6749
@@ -1135,8 +1139,12 @@
 17-11-2025,Lorenzo,PT7249
 17-11-2025,Raffaele,SC9190
 18-11-2025,Gabriele,TN1061
+18-11-2025,Giuseppe,nuoro
 19-11-2025,Gabriele,TN4107
+19-11-2025,Giuseppe,nuoro
 19-11-2025,Raffaele,SO7103
+20-11-2025,Giuseppe,nuoro
+21-11-2025,Giuseppe,nuoro
 21-11-2025,Lorenzo,PO9023
 21-11-2025,Raffaele,UM9242
 24-11-2025,Fabrizio,CAR6391
